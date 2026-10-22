@@ -84,7 +84,7 @@ going stale.
 ## Status
 
 Early. Claude Code only for now; `discover.mjs` also reads Codex's files, but the page doesn't
-draw them yet. Tested on macOS.
+draw them yet. Tested on macOS; CI runs the tests on macOS, Linux and Windows 10+ (Node 20 and 22).
 
 ```bash
 npm test

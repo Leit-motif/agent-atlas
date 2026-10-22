@@ -8,8 +8,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn, execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
-const repo = new URL("..", import.meta.url).pathname;
+const repo = fileURLToPath(new URL("..", import.meta.url));
 const chrome = process.env.CHROME ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const W = 1440, H = 860, SCALE = 4 / 3; // 1920 x 1147 frames
 const PORT = 9333;

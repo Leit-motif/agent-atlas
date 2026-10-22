@@ -58,7 +58,7 @@ their entries yourself.
 Run the build command from step 2 again. Its first line should say `0 still needed`; if not,
 write the missing summaries and build once more.
 
-Open `$OUT/atlas.html` for the user: `open` on macOS, `xdg-open` on Linux, `start` on Windows.
+Open `$OUT/atlas.html` for the user: `open` on macOS, `xdg-open` on Linux, `start "" "<path>"` on Windows.
 Then tell them in a few lines: how many files load at start, anything the script flagged as
 missing, and one thing on the map they might not have known about (an import chain, a hook, a
 plugin's skills). Give the page's full path.

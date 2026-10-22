@@ -7,8 +7,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
-const repo = new URL("..", import.meta.url).pathname;
+const repo = fileURLToPath(new URL("..", import.meta.url));
 const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "agent-atlas-demo-")));
 const home = path.join(root, "home"), proj = path.join(home, "code", "storefront");
 const put = (p, text) => { fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, text); };
@@ -53,8 +54,8 @@ put(`${proj}/.mcp.json`, JSON.stringify({ mcpServers: { postgres: { command: "np
 // Discover, then fill a few inferred summaries so the page shows how they look.
 const out = path.join(repo, "out"), graph = path.join(out, "demo-graph.json"), req = path.join(out, "demo-request.json"), sum = path.join(out, "demo-summaries.json");
 fs.mkdirSync(out, { recursive: true });
-fs.writeFileSync(graph, execFileSync("node", [`${repo}src/discover.mjs`, "--home", home, "--cwd", proj, "--no-system", "--json"]));
-const build = (...args) => execFileSync("node", [`${repo}src/build.mjs`, graph, path.join(out, "demo.html"), ...args], { encoding: "utf8" });
+fs.writeFileSync(graph, execFileSync(process.execPath, [`${repo}src/discover.mjs`, "--home", home, "--cwd", proj, "--no-system", "--json"]));
+const build = (...args) => execFileSync(process.execPath, [`${repo}src/build.mjs`, graph, path.join(out, "demo.html"), ...args], { encoding: "utf8" });
 build("--request", req);
 const TEXT = { // keyed by path suffix, since two files are both called CLAUDE.md
   ".claude/CLAUDE.md": "Sets how you like answers written and which tools to prefer, through two imported files.",
