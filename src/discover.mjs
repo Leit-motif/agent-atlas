@@ -222,7 +222,7 @@ for (const m of toml.matchAll(/^\[plugins\."([^"]+)"\]/gm)) edge(CX, node(`plugi
 skillsIn(CX, path.join(CODEX_HOME, "skills"), "codex");
 skillsIn(CX, path.join(HOME, ".agents/skills"), "codex");
 skillsIn(CX, path.join(gitRoot, ".agents/skills"), "codex");
-notes.push("Codex search order (AGENTS.override.md, fallbacks, ~/.agents/skills) is from memory of its docs; confirm before relying on it.");
+// Codex search order (AGENTS.override.md, fallbacks, ~/.agents/skills) is unconfirmed; the page does not draw Codex yet.
 
 // ================= output =================
 // A memory file both tools load is one node with two incoming loads; that overlap is the interesting part.

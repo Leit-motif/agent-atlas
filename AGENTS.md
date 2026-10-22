@@ -2,6 +2,8 @@
 
 Maps what a Claude Code session loads and renders it as one HTML page.
 
+- `skills/atlas/SKILL.md` is the product: the skill users install. It runs the two scripts and has
+  Claude write the summaries. `claude plugin validate .` checks the plugin and marketplace files.
 - `src/discover.mjs` reads config files and emits a graph; `src/build.mjs` fills
   `renderer/atlas.html`'s `/*@ATLAS_DATA@*/` marker with it. Change the page in the renderer, the
   data in the builder.
