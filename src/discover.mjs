@@ -24,7 +24,7 @@ const notes = [];
 
 // Node ids use "/" on every OS, so build.mjs and the page never see a Windows backslash.
 const slash = (p) => p.split(path.sep).join("/");
-const tilde = (p) => slash(p === HOME || p.startsWith(HOME + path.sep) ? "~" + p.slice(HOME.length) : p);
+const tilde = (p) => { p = path.normalize(p); return slash(p === HOME || p.startsWith(HOME + path.sep) ? "~" + p.slice(HOME.length) : p); }; // normalize: on Windows a hook can name C:\x\home/y
 const show = (id) => (GIT && id.startsWith(GIT + "/") ? "<repo>" + id.slice(GIT.length) : id);
 const exists = (p) => { try { fs.statSync(p); return true; } catch { return false; } };
 const isFile = (p) => { try { return fs.statSync(p).isFile(); } catch { return false; } };
