@@ -13,4 +13,5 @@ Maps what a Claude Code session loads and renders it as one HTML page.
   settings entry). Anything a model wrote is a summary, shown with the Inferred label.
 - Nothing from a real machine is committed: `out/` is ignored. Demos and screenshots come from
   `scripts/demo.mjs`'s made-up setup.
-- Run `npm test` after any change, and `npm run screenshot` when the page's look changes.
+- Run `npm test` after any change. When the page's look changes, run `npm run screenshot` and
+  `npm run record` (Chrome and ffmpeg) and look at the results before committing them.

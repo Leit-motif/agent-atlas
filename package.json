@@ -9,6 +9,7 @@
     "atlas": "mkdir -p out && node src/discover.mjs --json > out/graph.json && node src/build.mjs out/graph.json out/atlas.html --summaries out/summaries.json --request out/request.json",
     "demo": "node scripts/demo.mjs",
     "screenshot": "node scripts/demo.mjs && node scripts/screenshot.mjs",
+    "record": "node scripts/demo.mjs && node scripts/record.mjs",
     "test": "node --test test/"
   }
 }

@@ -7,9 +7,9 @@ rules from every parent folder, settings at three levels, hooks, skills, subagen
 servers. agent-atlas finds all of them on your machine and draws them as one map you can fold,
 search and click through.
 
-![The Atlas for a sample project: instructions, hooks, skills, subagents, plugins and MCP servers around the session, with one hook open in the side panel](docs/atlas.png)
+![The Atlas for a sample project: opening Instructions shows the files they import, opening Hooks leads to a hook that blocks force-pushes and the settings file that wires it, then the Files view lists every file you can edit](docs/atlas-demo.gif)
 
-*A made-up project, rendered by `npm run screenshot`. Your own map stays on your machine.*
+*A made-up project, recorded with `npm run record`. [Full-quality video (MP4)](docs/atlas-demo.mp4). Your own map stays on your machine.*
 
 ## Install
 
