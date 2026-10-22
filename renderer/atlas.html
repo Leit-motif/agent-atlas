@@ -1,0 +1,742 @@
+<meta charset="utf-8">
+<title>Claude Code Atlas</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: an app shell. A living graph on the left that folds like a tree (rings are depth, wedges are areas), an inspector on the right; stacked on phones. */
+:root{
+  --bg:#F2F2EF; --panel:#FFFFFF; --raised:#F7F6F3; --fg:#1E1D1A; --muted:#6A665E; --line:#DCD9D2; --edge:#B9B4AA; --ring:#E6E3DC;
+  --c-rules:hsl(36 42% 38%); --c-machines:hsl(172 42% 30%); --c-models:hsl(262 32% 46%); --c-workflow:hsl(212 42% 40%);
+  --c-trust:hsl(354 42% 44%); --c-skills:hsl(128 30% 34%); --c-claude:hsl(20 42% 42%); --c-records:hsl(220 14% 42%); --c-root:#1E1D1A;
+  --ok:hsl(140 40% 32%); --warn:hsl(38 70% 34%); --miss:hsl(354 50% 44%);
+  --display:"Schibsted Grotesk","Helvetica Neue",Arial,sans-serif;
+  --body:"Schibsted Grotesk","Helvetica Neue",Arial,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#151515; --panel:#1C1C1B; --raised:#232321; --fg:#ECE7DE; --muted:#A29D93; --line:#33322E; --edge:#57544D; --ring:#222220;
+    --c-rules:hsl(36 42% 62%); --c-machines:hsl(172 42% 52%); --c-models:hsl(262 42% 72%); --c-workflow:hsl(212 42% 66%);
+    --c-trust:hsl(354 42% 66%); --c-skills:hsl(128 30% 60%); --c-claude:hsl(20 42% 64%); --c-records:hsl(220 14% 68%); --c-root:#ECE7DE;
+    --ok:hsl(140 35% 60%); --warn:hsl(38 60% 62%); --miss:hsl(354 50% 68%);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#151515; --panel:#1C1C1B; --raised:#232321; --fg:#ECE7DE; --muted:#A29D93; --line:#33322E; --edge:#57544D; --ring:#222220;
+  --c-rules:hsl(36 42% 62%); --c-machines:hsl(172 42% 52%); --c-models:hsl(262 42% 72%); --c-workflow:hsl(212 42% 66%);
+  --c-trust:hsl(354 42% 66%); --c-skills:hsl(128 30% 60%); --c-claude:hsl(20 42% 64%); --c-records:hsl(220 14% 68%); --c-root:#ECE7DE;
+  --ok:hsl(140 35% 60%); --warn:hsl(38 60% 62%); --miss:hsl(354 50% 68%);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:14.5px;line-height:1.5;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit}
+a{color:inherit}
+code{font-family:var(--mono);font-size:.86em;background:var(--raised);border:1px solid var(--line);border-radius:4px;padding:0 4px;word-break:break-word}
+:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+
+.app{display:grid;grid-template-rows:auto 1fr;height:100%;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header.top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;padding-block:14px 12px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:baseline;gap:10px;min-width:0}
+.brand h1{font-family:var(--display);font-weight:800;font-size:20px;letter-spacing:-.01em;margin:0;white-space:nowrap}
+.brand span{color:var(--muted);font-size:13px}
+.crumbs{display:flex;flex-wrap:wrap;align-items:center;gap:4px;font-size:13px;min-width:0;flex:1 1 260px}
+.crumbs button{background:none;border:0;padding:3px 6px;border-radius:5px;cursor:pointer;color:var(--muted)}
+.crumbs button:hover{background:var(--raised);color:var(--fg)}
+.crumbs button[aria-current]{color:var(--fg);font-weight:600;cursor:default;background:none}
+.crumbs .sep{color:var(--edge)}
+.tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{display:inline-flex;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:6px 11px;font-size:13px;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--edge);background:var(--raised)}
+.views{display:inline-flex;border:1px solid var(--line);border-radius:8px;padding:2px;background:var(--panel)}
+.views button{background:none;border:0;border-radius:6px;padding:5px 12px;font-size:13px;cursor:pointer;color:var(--muted)}
+.views button:hover{color:var(--fg)}
+.views button[aria-selected="true"]{background:var(--raised);color:var(--fg);font-weight:600}
+.btn.primary{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.btn.primary:hover{opacity:.9;background:var(--fg)}
+.search{position:relative}
+.search input{width:220px;max-width:100%;background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:6px 10px;font:inherit;font-size:13px;color:var(--fg)}
+.search input::placeholder{color:var(--muted)}
+.results{position:absolute;right:0;top:calc(100% + 6px);width:min(360px,calc(100vw - 32px));max-height:360px;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:9px;box-shadow:0 10px 30px rgb(0 0 0 / .18);z-index:30;padding:4px}
+.results button{display:block;width:100%;text-align:left;background:none;border:0;padding:7px 9px;border-radius:6px;cursor:pointer}
+.results button:hover,.results button.on{background:var(--raised)}
+.results b{font-weight:600}
+.results small{display:block;color:var(--muted);font-size:12px}
+.results .none{padding:10px;color:var(--muted);font-size:13px}
+
+main.body{display:grid;grid-template-columns:minmax(0,1fr) 380px;min-height:0}
+.stage{position:relative;min-height:0;overflow:hidden;background:var(--bg)}
+#graph{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+#graph:active{cursor:grabbing}
+.depth-ring{fill:none;stroke:var(--ring);stroke-width:1}
+.tree{fill:none;stroke:var(--edge);stroke-width:1.2;opacity:.55;transition:opacity .2s}
+.x{fill:none;stroke:var(--edge);opacity:.32;transition:opacity .2s,stroke .2s}
+.x.flow{stroke-dasharray:none}
+.x.use{stroke-dasharray:6 4}
+.x.check{stroke-dasharray:1.5 4;stroke-linecap:round}
+.x.why{stroke-dasharray:12 5}
+.x.lit{stroke:var(--fg);opacity:.95}
+.x.trace{stroke:var(--fg);opacity:1;stroke-dasharray:7 6;animation:run 0.9s linear infinite}
+@keyframes run{to{stroke-dashoffset:-13}}
+.dim{opacity:.1 !important}
+.n{cursor:pointer;outline:none}
+.n:focus-visible .halo{opacity:.9}
+.n .body{fill:var(--panel);stroke:var(--hue);stroke-width:1.6}
+.n.root .body{fill:var(--fg);stroke:var(--fg)}
+.n.gen .body{fill:var(--bg);stroke-dasharray:3 3}
+.n .dial{fill:none;stroke:var(--hue);stroke-width:2.6;stroke-linecap:round}
+.n .seed{fill:var(--hue);opacity:.75}
+.n .halo{fill:none;stroke:var(--hue);stroke-width:2;opacity:0}
+.n.sel .halo{opacity:.55}
+.n.portal .body{fill:var(--bg);stroke:var(--muted);stroke-dasharray:2 3}
+.n text{font-family:var(--body);font-size:12px;fill:var(--fg);text-anchor:middle;paint-order:stroke;stroke:var(--bg);stroke-width:4px;stroke-linejoin:round;pointer-events:none}
+.n text.k{font-size:10.5px;fill:var(--muted)}
+.n.root text.t{font-weight:700;font-size:14px}
+.n.area text.t{font-weight:650;font-size:13px}
+.n.portal text{fill:var(--muted);font-size:11.5px}
+.n .lbl{opacity:0;transition:opacity .15s}
+.n .lbl.on{opacity:1}
+.n .st{font-size:9.5px;font-weight:650;letter-spacing:.05em;text-transform:uppercase;fill:var(--warn)}
+@media (prefers-reduced-motion: reduce){ .x.trace{animation:none;stroke-dasharray:none} }
+
+.overlay{position:absolute;display:flex;flex-direction:column;gap:6px;pointer-events:none}
+.overlay > *{pointer-events:auto}
+.tl{left:12px;top:12px}
+.bl{left:12px;bottom:12px}
+.br{right:12px;bottom:12px;flex-direction:row}
+.hint{font-size:12px;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:5px 9px;max-width:300px}
+.legend{background:color-mix(in srgb,var(--panel) 92%,transparent);border:1px solid var(--line);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:4px;font-size:12px}
+.legend summary{cursor:pointer;font-size:12px;font-weight:600;list-style:none}
+.legend summary::-webkit-details-marker{display:none}
+.legend summary::before{content:"▸ ";color:var(--muted)}
+.legend[open] summary::before{content:"▾ "}
+.legend h4{margin:0 0 2px;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:650}
+.lens{display:flex;align-items:center;gap:8px;background:none;border:0;padding:2px 4px;border-radius:5px;cursor:pointer;text-align:left}
+.lens:hover{background:var(--raised)}
+.lens svg{flex:none}
+.lens[aria-pressed="false"]{opacity:.4}
+.lens small{color:var(--muted)}
+.keyrow{display:flex;align-items:center;gap:8px;color:var(--muted)}
+.mini-btn{background:var(--panel);border:1px solid var(--line);border-radius:7px;width:34px;height:34px;display:grid;place-items:center;cursor:pointer;font-size:15px}
+.mini-btn:hover{border-color:var(--edge)}
+.tracebar{background:var(--fg);color:var(--bg);border-radius:8px;padding:6px 8px 6px 12px;font-size:12.5px;display:flex;align-items:center;gap:10px}
+.tracebar button{background:transparent;border:1px solid color-mix(in srgb,var(--bg) 40%,var(--fg));color:var(--bg);border-radius:6px;padding:2px 8px;cursor:pointer;font-size:12px}
+
+aside.insp{border-left:1px solid var(--line);overflow:auto;min-height:0;background:var(--panel)}
+.insp-in{padding:22px 22px 40px;display:flex;flex-direction:column;gap:18px}
+.eyebrow{font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--hue);font-weight:650;display:flex;align-items:center;gap:7px}
+.eyebrow i{width:9px;height:9px;border-radius:50%;background:var(--hue);display:inline-block}
+.insp h2{font-family:var(--display);font-size:24px;line-height:1.15;font-weight:750;margin:0;letter-spacing:-.01em;text-wrap:balance}
+.insp .lead{font-size:15.5px;line-height:1.5;margin:0}
+.insp p{margin:0;color:color-mix(in srgb,var(--fg) 86%,var(--muted))}
+.prose{display:flex;flex-direction:column;gap:10px}
+.sec h3{font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:650;margin:0 0 8px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{background:var(--raised);border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:12.5px;cursor:pointer;text-align:left}
+.chip:hover{border-color:var(--hue)}
+.chip small{color:var(--muted)}
+.conn{display:flex;flex-direction:column;gap:10px}
+.conn .grp{display:flex;flex-direction:column;gap:6px}
+.conn .grp b{font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:7px}
+.status{align-self:flex-start;font-size:12px;padding:2px 9px;border-radius:999px;border:1px solid currentColor;font-weight:600}
+.status.live{color:var(--ok)} .status.partial{color:var(--warn)} .status.missing{color:var(--miss)} .status.archived,.status.off{color:var(--muted)}
+dl.items{margin:0;display:grid;grid-template-columns:minmax(0,max-content) minmax(0,1fr);gap:7px 12px;font-size:13.5px}
+dl.items dt{font-weight:600;font-family:var(--mono);font-size:12.5px;padding-top:1px;word-break:break-word}
+dl.items dd{margin:0;color:color-mix(in srgb,var(--fg) 86%,var(--muted))}
+.tbl{overflow-x:auto}
+.tbl table{border-collapse:collapse;width:100%;font-size:13px}
+.tbl th{text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:650;border-bottom:1px solid var(--line);padding:5px 8px 5px 0}
+.tbl td{border-bottom:1px solid var(--line);padding:6px 8px 6px 0;vertical-align:top}
+.tbl td:first-child{font-weight:600}
+.chain{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px;counter-reset:s}
+.chain li{display:grid;grid-template-columns:56px 1fr;gap:8px;align-items:baseline;font-size:13.5px}
+.chain li span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.files{display:flex;flex-direction:column;gap:10px}
+.file{border:1px solid var(--line);border-radius:9px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;background:var(--raised)}
+.file .path{font-family:var(--mono);font-size:12.5px;font-weight:500;word-break:break-all}
+.file .note{font-size:13px;color:var(--muted)}
+.file .row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.file .mini{font-size:12px;padding:3px 9px;border-radius:6px;border:1px solid var(--line);background:var(--panel);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:5px}
+.file .mini:hover{border-color:var(--edge)}
+.file .after{font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:3px}
+.file .after code{display:block;padding:4px 7px;white-space:pre-wrap}
+.file.gen{background:transparent;border-style:dashed}
+.badge{font-size:10.5px;font-weight:650;letter-spacing:.05em;text-transform:uppercase;padding:1px 6px;border-radius:4px;border:1px solid currentColor}
+.badge.inferred{color:var(--muted);border-style:dashed;margin-right:4px} .fact{font-size:13px;color:var(--muted)!important} .badge.edit{color:var(--ok)} .badge.gen{color:var(--warn)} .badge.local{color:var(--muted)}
+.links{display:flex;flex-direction:column;gap:5px;font-size:13.5px}
+.links a{text-decoration:none;border-bottom:1px solid var(--line)}
+.links a:hover{border-color:var(--fg)}
+.pagecta{display:flex;flex-wrap:wrap;gap:8px}
+
+.knobs{padding-block:24px 60px;display:flex;flex-direction:column;gap:26px;max-width:980px;overflow:auto}
+.knobs .intro h2{font-family:var(--display);font-size:28px;font-weight:800;margin:0 0 6px;letter-spacing:-.01em}
+.knobs .intro p{margin:0;color:var(--muted);max-width:66ch}
+.kgroup h3{font-size:15px;margin:0 0 4px;font-weight:700;display:flex;align-items:center;gap:8px}
+.kgroup h3 i{width:10px;height:10px;border-radius:50%;background:var(--hue)}
+.kgroup>p{margin:0 0 10px;color:var(--muted);font-size:13.5px;max-width:70ch}
+.kgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,290px),1fr));gap:10px}
+.kgrid .file{background:var(--panel)}
+.kgrid .file.gen{background:transparent}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:7px 14px;border-radius:8px;font-size:13px;z-index:50}
+footer.foot{font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:12px}
+
+@media (max-width:1100px){
+  .app{height:auto;min-height:100%}
+  main.body{grid-template-columns:minmax(0,1fr)}
+  .stage{height:68vh;border-bottom:1px solid var(--line)}
+  aside.insp{border-left:0;overflow:visible}
+  .insp-in{padding:20px 0 40px}
+  .search input{width:170px}
+}
+@media (max-width:600px){ .legend .keyrow{display:none} .hint{display:none} }
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brand"><h1>Claude Code Atlas</h1><span>what a session loads on this machine</span></div>
+    <nav class="crumbs" id="crumbs" aria-label="Where you are"></nav>
+    <div class="tools">
+      <div class="search">
+        <input id="q" type="search" placeholder="Find a file or idea…" autocomplete="off" aria-label="Find a file or idea">
+        <div class="results" id="results" hidden></div>
+      </div>
+      <button class="btn" id="expandAll" type="button">Unfold all</button>
+      <button class="btn" id="collapseAll" type="button">Fold</button>
+      <div class="views" role="tablist" aria-label="View"><button id="mapBtn" type="button" role="tab" aria-selected="true">Map</button><button id="knobsBtn" type="button" role="tab" aria-selected="false">Files</button></div>
+    </div>
+  </header>
+  <main class="body" id="main">
+    <div class="stage" id="stage">
+      <svg id="graph" role="img" aria-label="Graph of what Claude Code loads. Rings are depth; each wedge is one area; lines show imports, links and what each part feeds.">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="var(--edge)"/></marker>
+          <marker id="arrowLit" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="var(--fg)"/></marker>
+        </defs>
+        <g id="world"><g id="rings"></g><g id="treeEdges"></g><g id="crossEdges"></g><g id="nodes"></g></g>
+      </svg>
+      <div class="overlay tl"><div class="hint" id="hint">Click a node to open it, again to fold it. Double-click to dive in. Drag to move things; scroll to zoom.</div><div id="traceSlot"></div></div>
+      <div class="overlay bl">
+        <details class="legend" id="legend" open><summary>Key</summary>
+          <h4>Lines</h4>
+          <button class="lens" type="button" data-lens="flow" aria-pressed="true"><svg width="34" height="10"><path d="M1 5H29" stroke="var(--fg)" stroke-width="1.6" marker-end="url(#arrowLit)"/></svg>flows into <small>generates, imports, loads</small></button>
+          <button class="lens" type="button" data-lens="use" aria-pressed="true"><svg width="34" height="10"><path d="M1 5H33" stroke="var(--fg)" stroke-width="1.6" stroke-dasharray="6 4"/></svg>uses</button>
+          <button class="lens" type="button" data-lens="check" aria-pressed="true"><svg width="34" height="10"><path d="M2 5H33" stroke="var(--fg)" stroke-width="1.8" stroke-dasharray="1.5 4" stroke-linecap="round"/></svg>checks <small>guards, reviews</small></button>
+          <button class="lens" type="button" data-lens="why" aria-pressed="true"><svg width="34" height="10"><path d="M1 5H33" stroke="var(--fg)" stroke-width="1.4" stroke-dasharray="12 5"/></svg>explains <small>the why</small></button>
+          <h4 style="margin-top:6px">Nodes</h4>
+          <div class="keyrow"><svg width="34" height="18"><circle cx="17" cy="9" r="6" fill="var(--panel)" stroke="var(--fg)" stroke-width="1.5"/><path d="M21.2 2.8 A 8.9 8.9 0 0 1 25.4 7" fill="none" stroke="var(--fg)" stroke-width="2.4" stroke-linecap="round"/></svg>has a file you can edit</div>
+          <div class="keyrow"><svg width="34" height="18"><circle cx="17" cy="9" r="6" fill="var(--bg)" stroke="var(--fg)" stroke-width="1.5" stroke-dasharray="3 3"/></svg>generated copy, don't edit</div>
+          <div class="keyrow"><svg width="34" height="18"><circle cx="17" cy="9" r="5" fill="var(--panel)" stroke="var(--fg)" stroke-width="1.4"/><circle cx="17" cy="1.8" r="1.4" fill="var(--fg)"/><circle cx="23.5" cy="12" r="1.4" fill="var(--fg)"/><circle cx="10.5" cy="12" r="1.4" fill="var(--fg)"/></svg>folded; dots are what's inside</div>
+          <div class="keyrow"><svg width="34" height="18"><circle cx="17" cy="9" r="6" fill="var(--bg)" stroke="var(--muted)" stroke-width="1.4" stroke-dasharray="2 3"/></svg>↗ lives outside this page</div>
+        </details>
+      </div>
+      <div class="overlay br"><button class="mini-btn" id="fitBtn" type="button" aria-label="Fit the graph to the screen" title="Fit">⤢</button></div>
+    </div>
+    <aside class="insp" id="insp" aria-live="polite"><div class="insp-in" id="inspIn"></div></aside>
+  </main>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script>
+/*@ATLAS_DATA@*/
+const TYPES = {
+  flow:{out:"Flows into", in:"Comes from"},
+  use:{out:"Uses", in:"Used by"},
+  check:{out:"Checks", in:"Checked by"},
+  why:{out:"Explains", in:"Explained by"}
+};
+
+/* ---------- index ---------- */
+const byId = new Map(), parentOf = new Map(), depthOf = new Map();
+(function walk(n, p, br, d){
+  n.br = n.br || br; byId.set(n.id, n); depthOf.set(n.id, d); if (p) parentOf.set(n.id, p.id);
+  (n.c||[]).forEach(ch => walk(ch, n, n.br === "root" ? ch.br : n.br, d+1));
+})(TREE, null, "root", 0);
+LINKS.forEach(l => { if (!byId.has(l[0]) || !byId.has(l[1])) console.warn("bad link", l); });
+const hue = br => `var(--c-${br})`;
+const pathTo = id => { const a=[]; let x=id; while (x){ a.unshift(x); x=parentOf.get(x); } return a; };
+const isUnder = (id, anc) => { let x=id; while (x){ if (x===anc) return true; x=parentOf.get(x); } return false; };
+const descCount = id => (byId.get(id).c||[]).reduce((s,c) => s + 1 + descCount(c.id), 0);
+const TUNABLE = new Set(["render","live","models","sync","skills"]);
+const kindOf = n => {
+  const f = n.f || [];
+  if (f.length && f.every(x => x[2] === "gen")) return "gen";
+  if (f.some(x => TUNABLE.has(x[2]) && !x[0].startsWith("~"))) return "knob";
+  return "idea";
+};
+
+/* ---------- state ---------- */
+let focus = "home", selected = "home", hovered = null, knobsOpen = false, trace = null;
+const expanded = new Set(["home"]);
+const lenses = new Set(["flow","use","check","why"]);
+const pos = new Map();
+const RING = [0, 165, 300, 415, 515, 600];
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmt = s => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>");
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ---------- the view: a tree walk, then links routed to whatever is visible ---------- */
+function rep(id, vis){
+  if (vis.has(id)) return id;
+  if (isUnder(id, focus)) { let x = id; while (!vis.has(x)) x = parentOf.get(x); return x; }
+  const anc = new Set(pathTo(focus));
+  let x = id; while (!anc.has(parentOf.get(x))) x = parentOf.get(x);
+  return "p:" + x;
+}
+function buildView(){
+  const nodes = [], vis = new Set();
+  (function walk(id, rd){
+    vis.add(id);
+    const n = byId.get(id);
+    nodes.push({id, rd, n});
+    if (expanded.has(id) && n.c) n.c.forEach(c => walk(c.id, rd+1));
+  })(focus, 0);
+  // angles: each subtree gets a wedge sized by how much of it is showing
+  const leaves = id => { const n = byId.get(id); return (expanded.has(id) && n.c && vis.has(n.c[0].id)) ? n.c.reduce((s,c)=>s+leaves(c.id),0) : 1; };
+  const ang = new Map();
+  (function wedge(id, a0, a1){
+    ang.set(id, (a0+a1)/2);
+    const n = byId.get(id); if (!(expanded.has(id) && n.c)) return;
+    const total = n.c.reduce((s,c)=>s+leaves(c.id),0); let a = a0;
+    n.c.forEach(c => { const w = (a1-a0) * leaves(c.id)/total; wedge(c.id, a, a+w); a += w; });
+  })(focus, -Math.PI/2 - Math.PI, Math.PI/2);
+  let maxRd = 0;
+  nodes.forEach(o => {
+    maxRd = Math.max(maxRd, o.rd);
+    const r = RING[Math.min(o.rd, RING.length-1)], a = ang.get(o.id);
+    o.tx = o.rd ? r*Math.cos(a) : 0; o.ty = o.rd ? r*Math.sin(a) : 0; o.a = a;
+    const kids = (o.n.c||[]).length, open = expanded.has(o.id) && kids;
+    o.kids = kids; o.open = !!open;
+    o.r = o.id === "home" ? 26 : o.rd === 0 ? 22 : (depthOf.get(o.id) === 1 ? 15 : 9) + (!open && kids ? Math.sqrt(descCount(o.id))*1.7 : 0);
+    o.kind = o.id === "home" ? "root" : kindOf(o.n);
+  });
+  // cross-links, folded onto the nearest visible node, aggregated
+  const agg = new Map(), portals = new Map();
+  LINKS.forEach((l, i) => {
+    if (!lenses.has(l[2])) return;
+    const a = rep(l[0], vis), b = rep(l[1], vis);
+    if (a === b || (a.startsWith("p:") && b.startsWith("p:"))) return;
+    const key = a+"|"+b+"|"+l[2];
+    if (!agg.has(key)) agg.set(key, {key, source:a, target:b, type:l[2], links:[]});
+    agg.get(key).links.push(i);
+    [a,b].forEach(x => { if (x.startsWith("p:")) { if (!portals.has(x)) portals.set(x, {angles:[]}); portals.get(x).angles.push(ang.get(x===a?b:a)); } });
+  });
+  const outer = RING[Math.min(maxRd, RING.length-1)] + (maxRd ? 120 : 190);
+  portals.forEach((p, id) => {
+    const real = id.slice(2), sx = p.angles.reduce((s,a)=>s+Math.cos(a),0), sy = p.angles.reduce((s,a)=>s+Math.sin(a),0);
+    const a = Math.atan2(sy, sx);
+    nodes.push({id, rd: maxRd+1, n: byId.get(real), real, portal:true, r:8, kind:"portal", tx: outer*Math.cos(a), ty: outer*Math.sin(a), a});
+  });
+  const tree = nodes.filter(o => !o.portal && o.rd > 0).map(o => ({key:"t"+o.id, source: parentOf.get(o.id), target: o.id}));
+  return {nodes, tree, cross:[...agg.values()], vis, maxRd};
+}
+
+/* ---------- drawing ---------- */
+const svg = d3.select("#graph"), world = d3.select("#world");
+const gRings = d3.select("#rings"), gTree = d3.select("#treeEdges"), gCross = d3.select("#crossEdges"), gNodes = d3.select("#nodes");
+let view = null, sim = null, k = 1, userMoved = false, pendingFit = null;
+const zoom = d3.zoom().scaleExtent([0.2, 3]).on("zoom", e => { if (e.sourceEvent) userMoved = true; world.attr("transform", e.transform); k = e.transform.k; labels(); });
+svg.call(zoom).on("dblclick.zoom", null);
+svg.on("click", e => { if (e.target === svg.node()) { trace = null; drawTrace(); paint(); } });
+
+function rebuild(opts = {}){
+  view = buildView();
+  const byKey = new Map(view.nodes.map(o => [o.id, o]));
+  view.nodes.forEach(o => {
+    const p = pos.get(o.id);
+    if (p) { o.x = p.x; o.y = p.y; o.vx = p.vx||0; o.vy = p.vy||0; }
+    else {
+      const par = o.portal ? {x:o.tx, y:o.ty} : pos.get(parentOf.get(o.id));
+      const s = par || {x: o.tx*0.6, y: o.ty*0.6};
+      o.x = s.x + (Math.random()-.5)*8; o.y = s.y + (Math.random()-.5)*8;
+    }
+    if (o.rd === 0 && !o.portal) { o.fx = 0; o.fy = 0; }
+  });
+  const ringsShown = d3.range(1, view.maxRd+1).map(i => RING[Math.min(i, RING.length-1)]);
+  gRings.selectAll("circle").data(ringsShown).join("circle").attr("class","depth-ring").attr("r", d => d);
+
+  gTree.selectAll("path").data(view.tree, d => d.key).join("path").attr("class","tree");
+  gCross.selectAll("path").data(view.cross, d => d.key).join(
+    enter => enter.append("path").call(p => p.append("title")),
+    update => update
+  ).attr("class", d => "x " + d.type)
+   .attr("stroke-width", d => 1.1 + Math.log2(d.links.length)*0.9)
+   .select("title").text(d => d.links.slice(0,6).map(i => `${byId.get(LINKS[i][0]).t} → ${byId.get(LINKS[i][1]).t}: ${LINKS[i][3]}`).join("\n") + (d.links.length > 6 ? `\n+${d.links.length-6} more` : ""));
+
+  const sel = gNodes.selectAll("g.n").data(view.nodes, d => d.id);
+  sel.exit().transition().duration(reduce?0:220).attr("opacity",0).attr("transform", d => {
+    const p = pos.get(parentOf.get(d.id)) || {x:d.x, y:d.y}; return `translate(${p.x},${p.y}) scale(.3)`;
+  }).remove();
+  const ent = sel.enter().append("g").attr("class","n").attr("tabindex",0).attr("role","button");
+  ent.append("circle").attr("class","halo");
+  ent.append("circle").attr("class","body");
+  ent.append("path").attr("class","dial");
+  ent.append("g").attr("class","seeds");
+  const lbl = ent.append("g").attr("class","lbl");
+  lbl.append("text").attr("class","t");
+  lbl.append("text").attr("class","k");
+  ent.append("text").attr("class","st");
+  ent.on("click", (e, d) => { e.stopPropagation(); clickNode(d); })
+     .on("dblclick", (e, d) => { e.stopPropagation(); if (d.portal) return; if (d.n.c) openPage(d.id); })
+     .on("mouseenter", (e, d) => { hovered = d.id; paint(); })
+     .on("mouseleave", () => { hovered = null; paint(); })
+     .on("keydown", (e, d) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); clickNode(d); } });
+  ent.call(d3.drag()
+     .on("start", (e, d) => { if (!e.active) sim.alphaTarget(.15).restart(); d.fx = d.x; d.fy = d.y; })
+     .on("drag", (e, d) => { d.fx = e.x; d.fy = e.y; })
+     .on("end", (e, d) => { if (!e.active) sim.alphaTarget(0); if (!(d.rd === 0 && !d.portal)) { d.fx = null; d.fy = null; } }));
+
+  const all = ent.merge(sel);
+  all.attr("class", d => `n ${d.kind}${d.id==="home"?" root":""}${!d.portal && depthOf.get(d.id)===1?" area":""}`)
+     .style("--hue", d => d.portal ? "var(--muted)" : hue(d.n.br))
+     .attr("aria-label", d => (d.portal ? "Elsewhere: " : "") + d.n.t);
+  all.select(".halo").attr("r", d => d.r + 6);
+  all.select(".body").attr("r", d => d.r);
+  all.select(".dial").attr("d", d => d.kind === "knob" ? arc(d.r + 4, -70, -15) : null);
+  all.select(".seeds").each(function(d){
+    const n = (!d.open && !d.portal) ? Math.min(d.kids, 14) : 0;
+    d3.select(this).selectAll("circle").data(d3.range(n)).join("circle").attr("class","seed").attr("r",1.7)
+      .attr("cx", i => (d.r+6)*Math.cos(-Math.PI/2 + i*2*Math.PI/Math.max(n,1)))
+      .attr("cy", i => (d.r+6)*Math.sin(-Math.PI/2 + i*2*Math.PI/Math.max(n,1)));
+  });
+  all.select("text.t").attr("y", d => d.r + (d.open||d.portal ? 15 : 19)).text(d => d.portal ? "↗ " + d.n.t : d.n.t);
+  all.select("text.k").attr("y", d => d.r + (d.open ? 28 : 32)).text(d => (d.portal || d.rd > 1 && !d.open) ? "" : (d.n.k || ""));
+  all.select("text.st").attr("y", d => -d.r - 8).text(d => d.n.st && d.n.st !== "live" && !d.portal ? d.n.st : "");
+
+  if (sim) sim.stop();
+  sim = d3.forceSimulation(view.nodes)
+    .force("x", d3.forceX(d => d.tx).strength(d => d.portal ? .3 : .16))
+    .force("y", d3.forceY(d => d.ty).strength(d => d.portal ? .3 : .16))
+    .force("tree", d3.forceLink(view.tree.map(t => ({source:t.source, target:t.target}))).id(d => d.id).distance(d => d.target.rd===1 ? RING[1] : 95).strength(.25))
+    .force("cross", d3.forceLink(view.cross.map(c => ({source:c.source, target:c.target}))).id(d => d.id).distance(240).strength(.012))
+    .force("charge", d3.forceManyBody().strength(d => -40 - d.r*5).distanceMax(320))
+    .force("collide", d3.forceCollide(d => d.r + 20).iterations(2))
+    .alpha(opts.alpha ?? .9).alphaDecay(.035)
+    .on("tick", tick);
+  paint();
+  if (opts.fit){
+    const target = () => opts.fit === "trace" && trace ? view.nodes.filter(o => traceView().nodes.has(o.id)) : null;
+    userMoved = false; pendingFit = target;
+    setTimeout(() => { if (!userMoved) fit(target()); }, reduce ? 0 : 900);
+    sim.on("end", () => { if (pendingFit && !userMoved) fit(pendingFit()); pendingFit = null; });
+  }
+  else if (opts.reveal) setTimeout(() => reveal(opts.reveal), reduce ? 0 : 600);
+}
+function arc(r, a0, a1){ const p = a => [r*Math.cos(a*Math.PI/180), r*Math.sin(a*Math.PI/180)]; const [x0,y0]=p(a0),[x1,y1]=p(a1); return `M${x0},${y0}A${r},${r} 0 0 1 ${x1},${y1}`; }
+function tick(){
+  const N = new Map(view.nodes.map(o => [o.id, o]));
+  view.nodes.forEach(o => pos.set(o.id, {x:o.x, y:o.y, vx:o.vx, vy:o.vy}));
+  gNodes.selectAll("g.n").attr("transform", d => `translate(${d.x},${d.y})`);
+  gTree.selectAll("path").attr("d", d => { const a = N.get(d.source), b = N.get(d.target); return a && b ? `M${a.x},${a.y}L${b.x},${b.y}` : null; });
+  gCross.selectAll("path").attr("d", d => {
+    const pts = bundle(d.source, d.target).map(id => N.get(id)).filter(Boolean);
+    if (pts.length < 2) return null;
+    const xy = pts.map(o => [o.x, o.y]);
+    const trim = (i, j, r) => { const [x,y] = xy[i], [px,py] = xy[j], L = Math.hypot(px-x, py-y) || 1; xy[i] = [x + (px-x)/L*r, y + (py-y)/L*r]; };
+    if (xy.length === 2) { const mx = (xy[0][0]+xy[1][0])/2, my = (xy[0][1]+xy[1][1])/2, dx = xy[1][0]-xy[0][0], dy = xy[1][1]-xy[0][1]; xy.splice(1, 0, [mx - dy*.18, my + dx*.18]); }
+    trim(0, 1, pts[0].r + 3); trim(xy.length-1, xy.length-2, pts[pts.length-1].r + 5);
+    return bundleLine(xy);
+  });
+}
+/* Hierarchical edge bundling (Holten 2006): a link follows the tree from its source up to the
+   nearest shared ancestor and back down, so links between two areas travel together. */
+const bundleLine = d3.line().curve(d3.curveBundle.beta(.82));
+function chain(id){
+  if (id.startsWith("p:")) return [focus, id];
+  const p = pathTo(id); return p.slice(p.indexOf(focus));
+}
+function bundle(a, b){
+  const A = chain(a), B = chain(b); let i = 0;
+  while (i < A.length && i < B.length && A[i] === B[i]) i++;
+  const lca = A[i-1];
+  return [...A.slice(i).reverse(), lca, ...B.slice(i)].filter((x, j, arr) => j === 0 || x !== arr[j-1]);
+}
+
+/* ---------- emphasis: hover and selection light a neighbourhood, a trace lights a path ---------- */
+function neighbourhood(id){
+  const s = new Set([id]);
+  view.tree.forEach(t => { if (t.source===id) s.add(t.target); if (t.target===id) s.add(t.source); });
+  view.cross.forEach(c => { if (c.source===id) s.add(c.target); if (c.target===id) s.add(c.source); });
+  return s;
+}
+function paint(){
+  const focusId = hovered || null;
+  const hood = focusId ? neighbourhood(focusId) : null;
+  const tr = trace ? traceView() : null;
+  gNodes.selectAll("g.n")
+    .classed("sel", d => d.id === selected || (d.portal && d.real === selected))
+    .classed("dim", d => tr ? !tr.nodes.has(d.id) : hood ? !hood.has(d.id) : false);
+  gTree.selectAll("path").classed("dim", d => tr ? true : hood ? !(d.source===focusId || d.target===focusId) : false);
+  gCross.selectAll("path")
+    .classed("lit", d => !tr && (d.source===(focusId||selected) || d.target===(focusId||selected)))
+    .classed("trace", d => tr ? tr.edges.has(d.key) : false)
+    .classed("dim", d => tr ? !tr.edges.has(d.key) : hood ? !(d.source===focusId || d.target===focusId) : false)
+    .attr("marker-end", d => d.type !== "flow" ? null : (tr && tr.edges.has(d.key)) || d.source===(focusId||selected) || d.target===(focusId||selected) ? "url(#arrowLit)" : "url(#arrow)");
+  labels(hood, tr);
+}
+function labels(hood, tr){
+  if (!view) return;
+  if (hood === undefined) { const f = hovered; hood = f ? neighbourhood(f) : null; tr = trace ? traceView() : null; }
+  const many = view.nodes.length > 34;
+  gNodes.selectAll("g.n").select(".lbl").classed("on", d =>
+    d.rd <= 1 || d.portal || d.open || !many || k >= 1.25 ||
+    d.id === selected || parentOf.get(d.id) === selected ||
+    (hood && hood.has(d.id)) || (tr && tr.nodes.has(d.id)));
+}
+
+/* ---------- trace: everything an edit flows into, or everything that flows into this ---------- */
+function computeTrace(id, dir){
+  const start = [id, ...allDesc(id)], dist = new Map(start.map(s => [s, 0])), q = [...start], used = new Set();
+  while (q.length){
+    const x = q.shift();
+    LINKS.forEach((l, i) => {
+      if (l[2] !== "flow") return;
+      const [from, to] = dir === "down" ? [l[0], l[1]] : [l[1], l[0]];
+      if (from !== x) return;
+      used.add(i);
+      if (!dist.has(to)) { dist.set(to, dist.get(x)+1); q.push(to); }
+    });
+  }
+  return {id, dir, dist, used, start:new Set(start)};
+}
+function allDesc(id){ const out=[]; (byId.get(id).c||[]).forEach(c => { out.push(c.id); out.push(...allDesc(c.id)); }); return out; }
+function traceView(){
+  const nodes = new Set(), edges = new Set();
+  trace.dist.forEach((_, id) => nodes.add(rep(id, view.vis)));
+  view.cross.forEach(c => { if (c.links.some(i => trace.used.has(i))) edges.add(c.key); });
+  return {nodes, edges};
+}
+function startTrace(id, dir){
+  trace = computeTrace(id, dir);
+  trace.dist.forEach((_, x) => { if (isUnder(x, focus)) pathTo(x).forEach(a => { if (a !== x && isUnder(a, focus)) expanded.add(a); }); });
+  rebuild({alpha:.6, fit:"trace"}); drawTrace(); inspect(selected);
+}
+function drawTrace(){
+  const slot = $("#traceSlot");
+  if (!trace) { slot.innerHTML = ""; return; }
+  const n = byId.get(trace.id);
+  slot.innerHTML = `<div class="tracebar">${trace.dir === "down" ? "What an edit to" : "What feeds"} <b>${esc(n.t)}</b> ${trace.dir === "down" ? "changes" : ""}<button type="button" id="endTrace">Done</button></div>`;
+  $("#endTrace").onclick = () => { trace = null; drawTrace(); paint(); inspect(selected); };
+}
+
+/* ---------- camera ---------- */
+function bbox(list){
+  const xs = [], ys = [];
+  list.forEach(o => { xs.push(o.x - o.r - 60, o.x + o.r + 60); ys.push(o.y - o.r - 20, o.y + o.r + 44); });
+  return {x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys)};
+}
+function fit(list, maxK = 1.6){
+  list = list || view.nodes; if (!list.length) return;
+  const b = bbox(list), W = svg.node().clientWidth, H = svg.node().clientHeight;
+  const s = Math.min((W-60)/(b.x1-b.x0), (H-110)/(b.y1-b.y0), maxK);
+  const t = d3.zoomIdentity.translate(W/2 - s*(b.x0+b.x1)/2, H/2 + 12 - s*(b.y0+b.y1)/2).scale(s);
+  svg.transition().duration(reduce?0:650).call(zoom.transform, t);
+}
+function reveal(id){
+  const group = view.nodes.filter(o => o.id === id || parentOf.get(o.id) === id);
+  const t = d3.zoomTransform(svg.node()), W = svg.node().clientWidth, H = svg.node().clientHeight, b = bbox(group);
+  const inView = t.applyX(b.x0) >= 0 && t.applyX(b.x1) <= W && t.applyY(b.y0) >= 0 && t.applyY(b.y1) <= H;
+  if (!inView) fit(view.nodes, Math.min(t.k, 1.6));
+}
+
+/* ---------- interaction ---------- */
+function clickNode(d){
+  const h = $("#hint"); if (h) h.remove();
+  if (d.portal) { const real = d.real; byId.get(real).c ? openPage(real) : openPage(parentOf.get(real) || "home", {select: real}); return; }
+  const n = d.n;
+  if (n.c && selected === d.id && expanded.has(d.id) && d.id !== focus) { fold(d.id); selected = d.id; rebuild({alpha:.5}); inspect(d.id); return; }
+  selected = d.id;
+  if (n.c && !expanded.has(d.id)) { expanded.add(d.id); rebuild({alpha:.7, reveal:d.id}); }
+  else paint();
+  inspect(d.id);
+}
+function fold(id){ expanded.delete(id); (byId.get(id).c||[]).forEach(c => fold(c.id)); }
+function go(id){
+  res.hidden = true; q.value = "";
+  if (knobsOpen || !isUnder(id, focus)) { openPage("home", {select:id}); return; }
+  pathTo(id).forEach(a => { if (a !== id && isUnder(a, focus)) expanded.add(a); });
+  if (byId.get(id).c) expanded.add(id);
+  selected = id; rebuild({alpha:.6, reveal:id}); inspect(id);
+}
+
+/* ---------- inspector ---------- */
+const AFTER_DEFAULT = AFTER.doc;
+function fileCard(f){
+  const [p, note, after, src] = f, isLocal = p.startsWith("~") || p.startsWith("/"), isGen = after === "gen";
+  const a = AFTER[after] || AFTER_DEFAULT;
+  const gh = isLocal || !REPO ? null : `${REPO}/${p.endsWith("/") ? "tree" : "blob"}/main/${p.replace(/\/$/,"")}`;
+  const full = isLocal ? p : LOCAL + p;
+  const badge = isGen ? `<span class="badge gen">don't edit</span>` : isLocal ? `<span class="badge local">on this Mac</span>` : (after==="doc" ? "" : `<span class="badge edit">tune here</span>`);
+  return `<div class="file${isGen?" gen":""}">
+    <div class="row"><span class="path">${esc(p)}</span>${badge}</div>
+    <div class="note">${fmt(note)}</div>
+    <div class="row">
+      ${gh ? `<a class="mini" href="${gh}" target="_blank" rel="noopener">Open on GitHub ↗</a>` : ""}
+      <button class="mini" type="button" data-copy="${esc(full)}">Copy path</button>
+      ${src ? `<button class="mini" type="button" data-src="${esc(src)}">Go to source →</button>` : ""}
+    </div>
+    ${!isGen && after !== "doc" ? `<div class="after">${esc(a.say)}${a.cmd ? `<code>${esc(a.cmd)}</code>` : ""}</div>` : isGen ? `<div class="after">${esc(a.say)}</div>` : ""}
+  </div>`;
+}
+function connections(id){
+  const groups = [];
+  Object.entries(TYPES).forEach(([type, names]) => {
+    const out = LINKS.filter(l => l[2]===type && l[0]===id), inn = LINKS.filter(l => l[2]===type && l[1]===id);
+    if (out.length) groups.push([names.out, type, out.map(l => [l[1], l[3]])]);
+    if (inn.length) groups.push([names.in, type, inn.map(l => [l[0], l[3]])]);
+  });
+  if (!groups.length) return "";
+  const sample = t => ({flow:'<path d="M1 5H23" stroke="var(--fg)" stroke-width="1.6" marker-end="url(#arrowLit)"/>', use:'<path d="M1 5H26" stroke="var(--fg)" stroke-width="1.6" stroke-dasharray="6 4"/>', check:'<path d="M2 5H26" stroke="var(--fg)" stroke-width="1.8" stroke-dasharray="1.5 4" stroke-linecap="round"/>', why:'<path d="M1 5H26" stroke="var(--fg)" stroke-width="1.4" stroke-dasharray="12 5"/>'})[t];
+  return `<div class="sec"><h3>Connections</h3><div class="conn">${groups.map(([name, type, items]) =>
+    `<div class="grp"><b><svg width="28" height="10">${sample(type)}</svg>${esc(name)}</b><div class="chips">${items.map(([x, why]) => `<button class="chip" type="button" data-go="${x}">${esc(byId.get(x).t)} <small>${esc(why)}</small></button>`).join("")}</div></div>`).join("")}</div></div>`;
+}
+function traceList(){
+  if (!trace) return "";
+  const rows = [...trace.dist.entries()].filter(([id]) => !trace.start.has(id)).sort((a,b) => a[1]-b[1]);
+  if (!rows.length) return "";
+  return `<div class="sec"><h3>${trace.dir==="down" ? "An edit here reaches" : "This is fed by"}</h3><ol class="chain">${rows.map(([id, d]) => `<li><span>${d} step${d>1?"s":""}</span><button class="chip" type="button" data-go="${id}">${esc(byId.get(id).t)}</button></li>`).join("")}</ol></div>`;
+}
+function inspect(id){
+  const n = byId.get(id), box = $("#inspIn"), path = pathTo(id);
+  box.style.setProperty("--hue", hue(n.br));
+  const area = n.br === "root" ? "Overview" : byId.get(path[1]).t;
+  let h = `<div class="eyebrow"><i></i>${esc(area)}</div><h2>${esc(n.t)}</h2>`;
+  if (n.st) h += `<span class="status ${n.st}">${n.st === "partial" ? "Partly built" : n.st === "missing" ? "Not built yet" : n.st}</span>`;
+  h += n.si ? `<p class="lead">${fmt(n.si)}</p><p class="fact"><span class="badge inferred" title="Written by Claude from the file. Check the file before relying on it.">Inferred</span> Claude wrote the line above from the file. Found by the script: ${fmt(n.s)}</p>` : `<p class="lead">${fmt(n.s)}</p>`;
+  const down = computeTrace(id, "down").dist.size > 1 + allDesc(id).length, up = computeTrace(id, "up").dist.size > 1 + allDesc(id).length;
+  const tb = [];
+  if (down) tb.push(`<button class="btn primary" type="button" data-trace="${id}" data-dir="down">Trace what an edit here changes</button>`);
+  if (up) tb.push(`<button class="btn" type="button" data-trace="${id}" data-dir="up">Trace what feeds this</button>`);
+  if (tb.length && !(trace && trace.id === id)) h += `<div class="pagecta">${tb.join("")}</div>`;
+  if (trace && trace.id === id) h += traceList();
+  if (n.b) h += `<div class="prose">${n.b.map(p => `<p>${fmt(p)}</p>`).join("")}</div>`;
+  if (n.table) h += `<div class="sec tbl"><table><thead><tr>${n.table.head.map(x=>`<th>${esc(x)}</th>`).join("")}</tr></thead><tbody>${n.table.rows.map(r=>`<tr>${r.map(x=>`<td>${esc(x)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+  if (n.items) h += `<div class="sec"><dl class="items">${n.items.map(([a,b]) => `<dt>${esc(a)}</dt><dd>${fmt(b)}</dd>`).join("")}</dl></div>`;
+  if (n.c && n.c.length) h += `<div class="sec"><h3>Inside</h3><div class="chips">${n.c.map(c => `<button class="chip" type="button" data-go="${c.id}">${esc(c.t)}</button>`).join("")}</div></div>`;
+  h += connections(id);
+  if (n.jump) h += `<div class="sec"><h3>See also</h3><div class="chips"><button class="chip" type="button" data-go="${n.jump}">${esc(byId.get(n.jump).t)} →</button></div></div>`;
+  if (n.f) h += `<div class="sec"><h3>Files</h3><div class="files">${n.f.map(fileCard).join("")}</div></div>`;
+  if (n.links) h += `<div class="sec"><h3>Read more</h3><div class="links">${n.links.map(([t,u]) => `<a href="${u}" target="_blank" rel="noopener">${esc(t)} ↗</a>`).join("")}</div></div>`;
+  const cta = [];
+  if (n.c && n.c.length && id !== focus) cta.push(`<button class="btn" type="button" data-page="${id}">Dive in: give it its own page →</button>`);
+  if (focus !== "home" && id === focus) cta.push(`<button class="btn" type="button" data-page="${parentOf.get(id)}">← Back out to ${esc(byId.get(parentOf.get(id)).t)}</button>`);
+  if (cta.length) h += `<div class="pagecta">${cta.join("")}</div>`;
+  if (id === "home") h += `<footer class="foot">Mapped on ${GENERATED.slice(0, 10)}. This page does not update itself; run agent-atlas again to refresh it.</footer>`;
+  box.innerHTML = h;
+  $("#insp").scrollTop = 0;
+}
+
+/* ---------- pages ---------- */
+function crumbs(){
+  const c = $("#crumbs");
+  if (knobsOpen){ c.innerHTML = `<button type="button" data-page="home">Claude Code</button><span class="sep">/</span><button type="button" aria-current="page">Files</button>`; return; }
+  const p = pathTo(focus);
+  c.innerHTML = p.map((id,i) => `<button type="button" ${i===p.length-1?'aria-current="page"':`data-page="${id}"`}>${esc(byId.get(id).t)}</button>`).join(`<span class="sep">/</span>`);
+}
+function openPage(id, opts={}){
+  knobsOpen = false; restoreMain(); views();
+  focus = id; selected = opts.select || id; trace = null; drawTrace();
+  expanded.clear(); expanded.add(id);
+  const n = byId.get(id);
+  if (id !== "home"){
+    let count = (n.c||[]).length;
+    for (const c of (n.c||[])) { if (c.c && count + c.c.length <= 18) { expanded.add(c.id); count += c.c.length; } }
+  }
+  if (opts.select){ pathTo(opts.select).forEach(x => { if (x !== opts.select && isUnder(x, id)) expanded.add(x); }); if (byId.get(opts.select).c) expanded.add(opts.select); }
+  pos.clear(); gNodes.selectAll("g.n").remove(); gTree.selectAll("path").remove(); gCross.selectAll("path").remove();
+  crumbs(); rebuild({fit:true}); inspect(selected);
+  setHash(id === "home" ? "" : id);
+}
+function setHash(h){ try { history.replaceState(null, "", h ? "#"+h : location.pathname + location.search); } catch(e){} }
+
+let savedMain = null;
+function restoreMain(){ if (savedMain){ $("#main").replaceWith(savedMain); savedMain = null; } }
+function openKnobs(){
+  if (knobsOpen) return;
+  knobsOpen = true; views();
+  const m = $("#main"); savedMain = m;
+  const wrap = document.createElement("main"); wrap.id = "main"; wrap.className = "knobs";
+  wrap.innerHTML = `<div class="intro"><h2>Files</h2><p>Every file you can edit to change how Claude Code behaves here, grouped by what it controls. Dashed cards are links or plugin copies: change what they point to instead. Edits reach the next session that starts in this folder.</p></div>`
+   + KNOBS.map(g => `<section class="kgroup" style="--hue:${hue(g.br)}"><h3><i></i>${esc(g.t)}</h3><p>${esc(g.s)}</p><div class="kgrid">${g.f.map(fileCard).join("")}</div></section>`).join("")
+   + `<footer class="foot">Paths are on this machine. Edits apply to the next session that starts here.</footer>`;
+  m.replaceWith(wrap);
+  crumbs(); setHash("knobs"); window.scrollTo(0,0);
+}
+
+/* ---------- search ---------- */
+const all = [...byId.values()];
+const q = $("#q"), res = $("#results");
+let hits = [], hi = 0;
+function search(){
+  const s = q.value.trim().toLowerCase();
+  if (!s){ res.hidden = true; return; }
+  hits = all.map(n => {
+    const files = (n.f||[]).map(f => f[0]).join(" ");
+    const hay = [n.t, n.k, n.s, n.si || "", (n.b||[]).join(" "), files, (n.items||[]).flat().join(" ")].join(" ").toLowerCase();
+    if (!hay.includes(s)) return null;
+    return {n, score: n.t.toLowerCase().includes(s) ? 0 : files.toLowerCase().includes(s) ? 1 : 2};
+  }).filter(Boolean).sort((a,b) => a.score - b.score).slice(0, 12);
+  hi = 0;
+  res.innerHTML = hits.length ? hits.map((h,i) => `<button type="button" class="${i===0?"on":""}" data-hit="${h.n.id}"><b>${esc(h.n.t)}</b><small>${esc(pathTo(h.n.id).slice(1,-1).map(x=>byId.get(x).t).join(" / ") || "Overview")}</small></button>`).join("") : `<div class="none">Nothing matches “${esc(q.value)}”.</div>`;
+  res.hidden = false;
+}
+q.addEventListener("input", search);
+q.addEventListener("keydown", e => {
+  const b = [...res.querySelectorAll("button")];
+  if (e.key === "ArrowDown" || e.key === "ArrowUp"){ e.preventDefault(); if (!b.length) return; hi = (hi + (e.key==="ArrowDown"?1:-1) + b.length) % b.length; b.forEach((x,i)=>x.classList.toggle("on", i===hi)); }
+  if (e.key === "Enter" && hits[hi]) go(hits[hi].n.id);
+  if (e.key === "Escape"){ res.hidden = true; q.blur(); }
+});
+document.addEventListener("click", e => { if (!e.target.closest(".search")) res.hidden = true; });
+
+/* ---------- delegated clicks ---------- */
+function toast(msg){ const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => t.hidden = true, 1600); }
+document.addEventListener("click", e => {
+  const t = e.target.closest("[data-copy],[data-go],[data-page],[data-src],[data-hit],[data-trace],[data-lens]");
+  if (!t) return;
+  if (t.dataset.hit) return go(t.dataset.hit);
+  if (t.dataset.copy){ const v = t.dataset.copy; navigator.clipboard.writeText(v).then(() => toast("Path copied")).catch(() => toast(v)); return; }
+  if (t.dataset.go) return go(t.dataset.go);
+  if (t.dataset.page) return openPage(t.dataset.page);
+  if (t.dataset.trace) return startTrace(t.dataset.trace, t.dataset.dir);
+  if (t.dataset.lens){
+    const L = t.dataset.lens; lenses.has(L) ? lenses.delete(L) : lenses.add(L);
+    t.setAttribute("aria-pressed", lenses.has(L)); rebuild({alpha:.3}); return;
+  }
+  if (t.dataset.src){
+    const src = t.dataset.src;
+    const node = all.find(n => (n.f||[]).some(f => f[0] === src && f[2] !== "gen"));
+    if (node) go(node.id);
+    else toast(src);
+  }
+});
+function views(){ $("#mapBtn").setAttribute("aria-selected", !knobsOpen); $("#knobsBtn").setAttribute("aria-selected", knobsOpen); }
+$("#knobsBtn").addEventListener("click", openKnobs);
+$("#mapBtn").addEventListener("click", () => { if (knobsOpen) openPage(focus); });
+$("#fitBtn").addEventListener("click", () => fit());
+$("#expandAll").addEventListener("click", () => {
+  if (knobsOpen) openPage(focus);
+  (function unfold(id){ const n = byId.get(id); if (n.c){ expanded.add(id); n.c.forEach(c => unfold(c.id)); } })(focus);
+  rebuild({fit:true});
+});
+$("#collapseAll").addEventListener("click", () => {
+  if (knobsOpen) openPage(focus);
+  expanded.clear(); expanded.add(focus); selected = focus; trace = null; drawTrace(); rebuild({fit:true}); inspect(focus);
+});
+let rz; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { if (!knobsOpen && view) fit(); }, 200); });
+
+/* ---------- boot ---------- */
+if (innerWidth < 1100 || innerHeight < 760) $("#legend").open = false;
+const start = (location.hash || "").slice(1);
+if (start === "knobs"){ openPage("home"); openKnobs(); }
+else if (byId.has(start)) openPage(byId.get(start).c ? start : (parentOf.get(start) || "home"), byId.get(start).c ? {} : {select: start});
+else openPage("home");
+</script>
+
+

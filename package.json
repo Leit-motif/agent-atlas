@@ -1,0 +1,14 @@
+{
+  "name": "agent-atlas",
+  "version": "0.1.0",
+  "description": "Map what a Claude Code session loads on your machine: instructions, imports, settings, hooks, skills, subagents, plugins and MCP servers.",
+  "type": "module",
+  "license": "MIT",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "atlas": "mkdir -p out && node src/discover.mjs --json > out/graph.json && node src/build.mjs out/graph.json out/atlas.html --summaries out/summaries.json --request out/request.json",
+    "demo": "node scripts/demo.mjs",
+    "screenshot": "node scripts/demo.mjs && node scripts/screenshot.mjs",
+    "test": "node --test test/"
+  }
+}

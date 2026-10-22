@@ -1,0 +1,6 @@
+# Everything generated from a real machine stays local: graphs, summaries and built pages
+# name your paths, skills, hooks and servers.
+out/
+*.local.*
+.DS_Store
+node_modules/
