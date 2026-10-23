@@ -228,12 +228,23 @@ const AFTER = {
   gen: { cmd: null, say: "Don't edit this copy: it is a link or ships with a plugin. Change what it points to." },
   doc: { cmd: null, say: "" },
 };
+// The page loads nothing from the network: d3 and the fonts are inlined, and a Content-Security-Policy
+// allows only this page's own scripts (by hash), so injected markup can neither run nor send data out.
+const vendor = (f) => new URL(`../renderer/vendor/${f}`, import.meta.url);
+const fonts = fs.readFileSync(vendor("fonts.css"), "utf8").replace(/url\(([\w.-]+\.woff2)\)/g, (_, f) => `url(data:font/woff2;base64,${fs.readFileSync(vendor(f)).toString("base64")})`);
+const d3 = fs.readFileSync(vendor("d3.min.js"), "utf8");
+// Data sits inside an inline script: escape "<" so no file name, heading or summary can close the tag.
+const js = (v) => JSON.stringify(v).replace(/</g, "\\u003c").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
 const template = fs.readFileSync(new URL("../renderer/atlas.html", import.meta.url), "utf8");
-if (!template.includes("/*@ATLAS_DATA@*/")) throw new Error("renderer/atlas.html has no /*@ATLAS_DATA@*/ marker");
+for (const marker of ["/*@ATLAS_DATA@*/", "/*@FONTS@*/", "/*@D3@*/"]) if (!template.includes(marker)) throw new Error(`renderer/atlas.html has no ${marker} marker`);
 const data =
-  `const REPO = null;\nconst LOCAL = ${JSON.stringify(G.home + "/")};\nconst GENERATED = ${JSON.stringify(G.generated)};\n` +
-  `const AFTER = ${JSON.stringify(AFTER)};\n` +
-  `const TREE = ${JSON.stringify(TREE)};\nconst KNOBS = ${JSON.stringify(KNOBS)};\nconst LINKS = ${JSON.stringify(goodLinks)};\n`;
+  `const REPO = null;\nconst LOCAL = ${js(G.home + "/")};\nconst GENERATED = ${js(G.generated)};\n` +
+  `const AFTER = ${js(AFTER)};\n` +
+  `const TREE = ${js(TREE)};\nconst KNOBS = ${js(KNOBS)};\nconst LINKS = ${js(goodLinks)};\n`;
+let page = template.replace("/*@ATLAS_DATA@*/", () => data).replace("/*@FONTS@*/", () => fonts).replace("/*@D3@*/", () => d3);
+const hashes = [...page.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => `'sha256-${crypto.createHash("sha256").update(m[1]).digest("base64")}'`);
+const csp = `default-src 'none'; script-src ${hashes.join(" ")}; style-src 'unsafe-inline'; font-src data:; img-src data:; base-uri 'none'; form-action 'none'`;
+page = page.replace('<meta charset="utf-8">', () => `<meta charset="utf-8">\n<meta http-equiv="Content-Security-Policy" content="${csp}">`);
 fs.mkdirSync(path.dirname(path.resolve(outPath)), { recursive: true });
-fs.writeFileSync(outPath, template.replace("/*@ATLAS_DATA@*/", () => data));
+fs.writeFileSync(outPath, page);
 console.log(`${valid.size} nodes, ${goodLinks.length} links, ${areas.length} areas → ${outPath}`);

@@ -7,6 +7,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
+import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 const SRC = fileURLToPath(new URL("../src/", import.meta.url));
@@ -20,6 +21,7 @@ function fixture() {
   put(`${home}/notes/style.md`, "# Style\nSee @./deeper.md\n");
   put(`${home}/notes/deeper.md`, "# Deeper\n");
   put(`${home}/hooks/guard.sh`, "#!/bin/sh\n");
+  put(`${home}/.claude/rules/hostile.md`, "# </script><script>document.title=`PWNED`</script>\n");
   put(`${home}/.claude/skills/tidy/SKILL.md`, "---\nname: tidy\ndescription: Tidies things up.\n---\n");
   put(`${home}/.claude/skills/crlf/SKILL.md`, "---\r\nname: crlf\r\ndescription: Saved with Windows line endings.\r\n---\r\n");
   put(`${home}/.claude/settings.json`, JSON.stringify({ env: { OPENAI_API_KEY: SECRETS[0] }, hooks: { PreToolUse: [{ matcher: "Bash", hooks: [{ type: "command", command: 'sh "$HOME/hooks/guard.sh"' }] }] } }));
@@ -69,6 +71,15 @@ test("build writes the page, keeps secrets out, and drops stale summaries", () =
   for (const s of SECRETS) assert.ok(!html.includes(s), "config values never reach the page");
   assert.ok(!/const LINKS = .*"home"/.test(html), "no link targets the root, which the renderer cannot route");
   assert.ok(html.includes("Saved with Windows line endings."), "CRLF frontmatter is read");
+
+  // A heading can't close the data script, only the page's own two scripts may run, and nothing loads from the network.
+  const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+  assert.equal(scripts.length, 2, "a file's text cannot open or close a script tag");
+  assert.equal((html.match(/<\/script>/g) ?? []).length, 2);
+  const csp = html.match(/<meta http-equiv="Content-Security-Policy" content="([^"]+)">/)?.[1] ?? "";
+  assert.match(csp, /default-src 'none'/);
+  for (const s of scripts) assert.ok(csp.includes(`'sha256-${crypto.createHash("sha256").update(s).digest("base64")}'`), "each script is allowed by its hash");
+  assert.ok(!/\b(src|href)=["']?https?:|url\(["']?https?:|@import\s+["']?https?:/i.test(html), "no network resources");
 
   // Answer every request, then change one file: only that summary is asked for again.
   const asked = JSON.parse(fs.readFileSync(req, "utf8"));
