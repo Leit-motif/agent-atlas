@@ -572,7 +572,7 @@ function fileCard(f){
   const a = AFTER[after] || AFTER_DEFAULT;
   const gh = isLocal || !REPO ? null : `${REPO}/${p.endsWith("/") ? "tree" : "blob"}/main/${p.replace(/\/$/,"")}`;
   const full = isLocal ? p : LOCAL + p;
-  const badge = isGen ? `<span class="badge gen">don't edit</span>` : isLocal ? `<span class="badge local">on this Mac</span>` : (after==="doc" ? "" : `<span class="badge edit">tune here</span>`);
+  const badge = isGen ? `<span class="badge gen">don't edit</span>` : isLocal ? `<span class="badge local">on this machine</span>` : (after==="doc" ? "" : `<span class="badge edit">tune here</span>`);
   return `<div class="file${isGen?" gen":""}">
     <div class="row"><span class="path">${esc(p)}</span>${badge}</div>
     <div class="note">${fmt(note)}</div>
