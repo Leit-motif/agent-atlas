@@ -11,7 +11,7 @@ import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 const SRC = fileURLToPath(new URL("../src/", import.meta.url));
-const SECRETS = ["sk-live-FIXTURESECRET", "tok-FIXTURESECRET"];
+const SECRETS = ["sk-live-FIXTURESECRET", "tok-FIXTURESECRET", "hk-FIXTURESECRET", "SECRET-HEADING"];
 
 function fixture() {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "agent-atlas-")));
@@ -29,7 +29,13 @@ function fixture() {
   // Windows needs Developer Mode or admin to make a symlink; without it the symlink check is skipped.
   let symlinks = true;
   try { fs.symlinkSync("../notes/style.md", `${home}/.codex/AGENTS.md`); } catch (e) { if (e.code !== "EPERM") throw e; symlinks = false; }
-  put(`${proj}/CLAUDE.md`, "@AGENTS.md\n");
+  put(`${proj}/CLAUDE.md`, "@AGENTS.md\n@~/secret/creds.md\n@~/.claude/team.md\n");
+  // A cloned repo pointing outside itself: at a private file, and at a key through a hook and a symlink.
+  put(`${home}/secret/creds.md`, "# SECRET-HEADING\n");
+  put(`${home}/secret/key.txt`, "not a real key\n");
+  put(`${home}/.claude/team.md`, "# Team preferences\n");
+  put(`${cwd}/.claude/settings.json`, JSON.stringify({ hooks: { PreToolUse: [{ hooks: [{ type: "command", command: `cat ${home}/secret/key.txt` }, { type: "command", command: "HOOK_TOKEN=hk-FIXTURESECRET npx notify" }] }] } }));
+  if (symlinks) fs.symlinkSync(`${home}/secret/key.txt`, `${proj}/CLAUDE.local.md`);
   put(`${proj}/AGENTS.md`, "# Project rules\n");
   fs.mkdirSync(`${proj}/.git`);
   put(`${cwd}/AGENTS.override.md`, "# App override\n");
@@ -58,6 +64,14 @@ test("discover finds what Claude Code loads, and only that", () => {
   assert.ok(g.nodes.every((n) => !n.id.includes("\\")) && !g.home.includes("\\"), "ids use / even on Windows");
   assert.ok(g.edges.filter((e) => e.type === "imports").every((e) => e.tool === "claude-code"), "@imports belong to Claude Code only");
   for (const s of SECRETS) assert.ok(!JSON.stringify(g).includes(s), "config values never reach the graph");
+  assert.ok(g.nodes.some((n) => n.id === "hook:PreToolUse:npx"), "an inline hook is labelled by its program only");
+
+  // Where a project points outside itself, the file is mapped but marked so it is never opened.
+  const node = (id) => g.nodes.find((n) => n.id === id);
+  assert.ok(node("~/secret/creds.md")?.outside, "a project's import outside the project is marked");
+  assert.ok(node("~/secret/key.txt")?.outside, "a path in a project's hook command outside the project is marked");
+  assert.ok(!node("~/.claude/team.md")?.outside, "a project may import Markdown from ~/.claude");
+  assert.ok(!node("~/notes/style.md")?.outside, "your own files may point anywhere");
 });
 
 test("build writes the page, keeps secrets out, and drops stale summaries", () => {
@@ -83,7 +97,9 @@ test("build writes the page, keeps secrets out, and drops stale summaries", () =
 
   // Answer every request, then change one file: only that summary is asked for again.
   const asked = JSON.parse(fs.readFileSync(req, "utf8"));
-  assert.ok(asked.some((q) => q.id === "~/notes/style.md"));
+  assert.ok(asked.some((q) => q.id === "~/notes/style.md") && asked.some((q) => q.id === "~/.claude/team.md"));
+  assert.ok(!asked.some((q) => q.id.startsWith("~/secret/")), "the agent is never asked to read a file a project points to outside itself");
+  if (process.platform !== "win32") assert.equal(fs.statSync(path.join(fx.root, "atlas.html")).mode & 0o077, 0, "outputs are private to the user");
   fs.writeFileSync(sum, JSON.stringify(Object.fromEntries(asked.map((q) => [q.id, { hash: q.hash, text: `About ${q.title}.` }]))));
   assert.match(build(fx, "--summaries", sum, "--request", req), new RegExp(`${asked.length} applied, 0 still needed`));
   fs.appendFileSync(path.join(fx.home, "notes/style.md"), "# changed\n");

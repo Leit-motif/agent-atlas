@@ -15,7 +15,8 @@ const flag = (name) => { const i = process.argv.indexOf(name); return i < 0 ? nu
 const G = JSON.parse(fs.readFileSync(graphPath, "utf8"));
 const HOME = G.home;
 const abs = (id) => (id.startsWith("~") ? HOME + id.slice(1) : id);
-const read = (p) => { try { return fs.readFileSync(p, "utf8").replace(/\r\n/g, "\n"); } catch { return null; } }; // CRLF files from Windows checkouts
+const MAX_BYTES = 50 * 2 ** 20;
+const read = (p) => { try { return fs.statSync(p).size > MAX_BYTES ? null : fs.readFileSync(p, "utf8").replace(/\r\n/g, "\n"); } catch { return null; } }; // CRLF files from Windows checkouts
 
 // ---- Claude Code's slice of the graph ----
 const ROOT = "session:claude-code";
@@ -36,6 +37,10 @@ function describe(p) {
   const h = t.match(/^#\s+(.+)/m)?.[1];
   return h ? `Starts with “${h.trim()}”. ${t.split("\n").length} lines.` : `${t.split("\n").length} lines.`;
 }
+// A file a project or plugin points to outside itself (discover.mjs marks it): shown by path, never opened.
+const sealed = (gid) => Boolean(N.get(gid)?.outside || out(gid, "links-to").some((e) => N.get(e.to)?.outside));
+const OUTSIDE = "Outside the project or plugin that points here, so Atlas doesn't open it. Check why it is referenced.";
+const about = (gid, p) => (sealed(gid) ? OUTSIDE : describe(p));
 const base = (id) => path.basename(id.replace(/\/$/, ""));
 const short = (s, n = 150) => (s && s.length > n ? s.slice(0, n - 1).replace(/\s\S*$/, "") + "…" : s);
 const inPluginCache = (id) => id.includes("/.claude/plugins/cache/");
@@ -58,10 +63,10 @@ function memoryNode(gid, why, seen = new Set()) {
   seen.add(gid);
   const n = N.get(gid);
   const linkTo = out(gid, "links-to")[0]?.to;
-  const desc = n.missing ? "Imported but not found. Claude Code skips it silently." : linkTo ? `A symlink. Claude Code reads ${linkTo}.` : describe(abs(gid));
+  const desc = n.missing ? "Imported but not found. Claude Code skips it silently." : linkTo ? `A symlink. Claude Code reads ${linkTo}.` : about(gid, abs(gid));
   const node = tnode(gid, {
     t: base(gid), k: why, s: desc,
-    f: [[gid, n.missing ? "Missing." : linkTo ? "A link: edit the file it points to." : "Read at session start. Edit it and the next session sees it.", linkTo || n.missing ? "gen" : inPluginCache(gid) ? "gen" : "live", linkTo]],
+    f: [[gid, n.missing ? "Missing." : n.outside ? "Named from outside: a project or plugin points here." : linkTo ? "A link: edit the file it points to." : "Read at session start. Edit it and the next session sees it.", n.outside ? "outside" : linkTo || n.missing ? "gen" : inPluginCache(gid) ? "gen" : "live", linkTo]],
     st: n.missing ? "missing" : undefined,
   });
   const kids = [];
@@ -96,7 +101,7 @@ const settings = {
     const node = tnode(e.to, {
       t: base(e.to), k: SCOPE[e.scope] ?? e.scope,
       s: `${SCOPE[e.scope] ?? e.scope} settings.${n.envKeys ? ` Sets ${n.envKeys} environment variable${n.envKeys === 1 ? "" : "s"}; their values are left off this page.` : ""}`,
-      f: [[e.to, "Edit it; most keys apply to the next session.", "live"]],
+      f: [[e.to, "Edit it; most keys apply to the next session.", sealed(e.to) ? "outside" : "live"]],
     });
     link(node.id, "home", "flow", "read at session start");
     return node;
@@ -118,7 +123,7 @@ const hooks = {
       const node = tnode(e.to, {
         t: base(e.to), k: e.matcher && e.matcher !== "*" ? `on ${e.matcher}` : EVENT[ev] ?? "",
         s: `Runs ${EVENT[ev] ?? ev}${e.matcher && e.matcher !== "*" ? ` for ${e.matcher}` : ""}. Wired by ${fromPlugin ? "the " + e.from.replace(/^plugin:/, "") + " plugin" : e.from}.`,
-        f: [[e.to, fromPlugin ? "Ships with a plugin; updates replace it." : "The script. Edits apply the next time the hook fires.", fromPlugin ? "gen" : "live"]],
+        f: [[e.to, sealed(e.to) ? "Named in a hook command, outside the project or plugin that wires it." : fromPlugin ? "Ships with a plugin; updates replace it." : "The script. Edits apply the next time the hook fires.", sealed(e.to) ? "outside" : fromPlugin ? "gen" : "live"]],
       });
       return node;
     }),
@@ -129,8 +134,8 @@ for (const e of wires) if (idOf.has(e.from) && idOf.has(e.to)) link(idOf.get(e.f
 // Skills and subagents of your own (user and project scope).
 const skillNode = (gid, owner) => tnode(gid, {
   t: base(gid), k: owner,
-  s: short(describe(path.join(abs(gid), "SKILL.md"))) ?? "A skill.",
-  f: [[gid + "/SKILL.md", inPluginCache(gid) ? "Ships with its plugin; updates replace it." : "Edit it; the next session lists the new description.", inPluginCache(gid) ? "gen" : "skills"]],
+  s: short(about(gid, path.join(abs(gid), "SKILL.md"))) ?? "A skill.",
+  f: [[gid + "/SKILL.md", inPluginCache(gid) ? "Ships with its plugin; updates replace it." : "Edit it; the next session lists the new description.", sealed(gid) ? "outside" : inPluginCache(gid) ? "gen" : "skills"]],
 });
 const groupSkills = (list, label) => {
   // Fold big lists into alphabetical groups so a ring never holds more than ~14 nodes.
@@ -151,13 +156,13 @@ const myAgents = out(ROOT, "provides").filter((e) => N.get(e.to).kind === "agent
 const agents = {
   id: "agents", br: "machines", t: "Subagents", k: `${myAgents.length} defined`,
   s: "Agent definitions Claude Code can hand work to. Each has its own prompt, tools and model.",
-  c: myAgents.map((e) => tnode(e.to, { t: base(e.to).replace(/\.md$/, ""), k: "yours", s: short(describe(abs(e.to))) ?? "A subagent.", f: [[e.to, "The definition.", "live"]] })),
+  c: myAgents.map((e) => tnode(e.to, { t: base(e.to).replace(/\.md$/, ""), k: "yours", s: short(about(e.to, abs(e.to))) ?? "A subagent.", f: [[e.to, "The definition.", sealed(e.to) ? "outside" : "live"]] })),
 };
 
 // Plugins, each with what it provides.
 const plugins = out(ROOT, "enables").map((e) => {
   const n = N.get(e.to), name = e.to.replace(/^plugin:/, "");
-  const kids = out(e.to, "provides").map((p) => N.get(p.to).kind === "skill" ? skillNode(p.to, "skill") : tnode(p.to, { t: base(p.to).replace(/\.md$/, ""), k: "subagent", s: short(describe(abs(p.to))) ?? "A subagent.", f: [[p.to, "Ships with the plugin.", "gen"]] })).sort((a, b) => a.t.localeCompare(b.t));
+  const kids = out(e.to, "provides").map((p) => N.get(p.to).kind === "skill" ? skillNode(p.to, "skill") : tnode(p.to, { t: base(p.to).replace(/\.md$/, ""), k: "subagent", s: short(about(p.to, abs(p.to))) ?? "A subagent.", f: [[p.to, "Ships with the plugin.", sealed(p.to) ? "outside" : "gen"]] })).sort((a, b) => a.t.localeCompare(b.t));
   const pluginHooks = out(e.to, "wires").length;
   return tnode(e.to, {
     t: name.split("@")[0], k: `${n.skills ?? 0} skills · ${n.agents ?? 0} agents${pluginHooks ? ` · ${pluginHooks} hooks` : ""}`,
@@ -199,14 +204,16 @@ const requests = [];
 let applied = 0;
 for (const [gid, tid] of idOf) {
   const g = N.get(gid);
-  if (!g || !SUMMARIZE.has(g.kind) || g.missing || out(gid, "links-to").length) continue;
+  if (!g || !SUMMARIZE.has(g.kind) || g.missing || sealed(gid) || out(gid, "links-to").length) continue;
   const text = g.kind === "plugin" || g.kind === "mcp" ? null : read(abs(gid));
   const hash = sha(text ?? gid);
   const have = SUMMARIES[gid];
   if (have && have.hash === hash) { treeNode.get(tid).si = have.text; applied++; continue; }
   requests.push({ id: gid, kind: g.kind, title: treeNode.get(tid).t, path: text == null ? null : abs(gid), hash, stale: Boolean(have) });
 }
-if (flag("--request")) fs.writeFileSync(flag("--request"), JSON.stringify(requests, null, 1) + "\n");
+// Outputs name your paths and setup: readable by you only (on Windows this only keeps them writable).
+const writePrivate = (p, text) => { fs.writeFileSync(p, text, { mode: 0o600 }); try { fs.chmodSync(p, 0o600); } catch {} };
+if (flag("--request")) writePrivate(flag("--request"), JSON.stringify(requests, null, 1) + "\n");
 if (applied) TREE.b[1] = `Descriptions come from each file's own heading or frontmatter. ${applied} lines marked Inferred were written by Claude from the file itself; check the file before relying on one.`;
 console.log(`summaries: ${applied} applied, ${requests.length} still needed${requests.some((q) => q.stale) ? ` (${requests.filter((q) => q.stale).length} stale)` : ""}`);
 
@@ -215,10 +222,10 @@ const valid = new Set(); (function w(n) { valid.add(n.id); (n.c || []).forEach(w
 const goodLinks = LINKS.filter((l) => valid.has(l[0]) && valid.has(l[1]) && l[0] !== l[1] && l[0] !== "home" && l[1] !== "home");
 
 const KNOBS = [
-  { t: "Instructions", br: "rules", s: "The files whose text the model reads every session.", f: [...idOf].filter(([g]) => N.get(g)?.kind === "memory" && !N.get(g).missing && !out(g, "links-to").length && !inPluginCache(g)).map(([g]) => [g, "Read at session start.", "live"]) },
-  { t: "Settings", br: "claude", s: "Permissions, environment, hooks and plugins.", f: settingsLoads.map((e) => [e.to, SCOPE[e.scope] ?? e.scope, "live"]) },
-  { t: "Hooks", br: "trust", s: "Scripts that run at fixed moments.", f: [...new Set(wires.map((e) => e.to))].filter((g) => !inPluginCache(g)).map((g) => [g, "A hook script.", "live"]) },
-  { t: "Your skills", br: "skills", s: "Skills you can edit directly.", f: mySkills.map((s) => s.f[0]) },
+  { t: "Instructions", br: "rules", s: "The files whose text the model reads every session.", f: [...idOf].filter(([g]) => N.get(g)?.kind === "memory" && !N.get(g).missing && !out(g, "links-to").length && !inPluginCache(g) && !sealed(g)).map(([g]) => [g, "Read at session start.", "live"]) },
+  { t: "Settings", br: "claude", s: "Permissions, environment, hooks and plugins.", f: settingsLoads.filter((e) => !sealed(e.to)).map((e) => [e.to, SCOPE[e.scope] ?? e.scope, "live"]) },
+  { t: "Hooks", br: "trust", s: "Scripts that run at fixed moments.", f: [...new Set(wires.map((e) => e.to))].filter((g) => !inPluginCache(g) && !sealed(g) && !g.startsWith("hook:")).map((g) => [g, "A hook script.", "live"]) },
+  { t: "Your skills", br: "skills", s: "Skills you can edit directly.", f: mySkills.map((s) => s.f[0]).filter((f) => f[2] !== "outside") },
 ].filter((g) => g.f.length);
 
 // ---- fill the renderer ----
@@ -226,6 +233,7 @@ const AFTER = {
   live: { cmd: null, say: "Edit it in place. The next session that starts here picks it up." },
   skills: { cmd: null, say: "Edit SKILL.md in place. The next session lists the change." },
   gen: { cmd: null, say: "Don't edit this copy: it is a link or ships with a plugin. Change what it points to." },
+  outside: { cmd: null, say: "A project or plugin points here, outside itself. Atlas leaves it unopened." },
   doc: { cmd: null, say: "" },
 };
 // The page loads nothing from the network: d3 and the fonts are inlined, and a Content-Security-Policy
@@ -246,5 +254,6 @@ const hashes = [...page.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => `'
 const csp = `default-src 'none'; script-src ${hashes.join(" ")}; style-src 'unsafe-inline'; font-src data:; img-src data:; base-uri 'none'; form-action 'none'`;
 page = page.replace('<meta charset="utf-8">', () => `<meta charset="utf-8">\n<meta http-equiv="Content-Security-Policy" content="${csp}">`);
 fs.mkdirSync(path.dirname(path.resolve(outPath)), { recursive: true });
-fs.writeFileSync(outPath, page);
+writePrivate(outPath, page);
+try { fs.chmodSync(graphPath, 0o600); } catch {}
 console.log(`${valid.size} nodes, ${goodLinks.length} links, ${areas.length} areas → ${outPath}`);

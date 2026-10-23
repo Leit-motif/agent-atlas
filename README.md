@@ -94,6 +94,10 @@ The page makes no network requests. Its scripts and fonts are bundled into the f
 Content-Security-Policy lets only its own two scripts run and blocks every connection out, so
 nothing in a file it maps can run code or send your setup anywhere.
 
+A project or plugin can't steer Atlas into your other files: anything it points to outside itself
+(an import of `~/.aws/credentials`, a symlink into `~/.ssh`) is shown by path, marked *not
+opened*, and never read or summarized. See [SECURITY.md](SECURITY.md).
+
 ## Every line is proven, every summary is labelled
 
 The lines on the map are things the script found: an import, a symlink, a hook wiring, a plugin

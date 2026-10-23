@@ -29,7 +29,8 @@ const show = (id) => (GIT && id.startsWith(GIT + "/") ? "<repo>" + id.slice(GIT.
 const exists = (p) => { try { fs.statSync(p); return true; } catch { return false; } };
 const isFile = (p) => { try { return fs.statSync(p).isFile(); } catch { return false; } };
 const lstatLink = (p) => { try { return fs.lstatSync(p).isSymbolicLink(); } catch { return false; } };
-const read = (p) => { try { return fs.readFileSync(p, "utf8"); } catch { return null; } };
+const MAX_BYTES = 50 * 2 ** 20; // skip, don't read, anything bigger: a hostile repo could plant a huge file
+const read = (p) => { try { return fs.statSync(p).size > MAX_BYTES ? null : fs.readFileSync(p, "utf8"); } catch { return null; } };
 const ls = (d) => { try { return fs.readdirSync(d, { withFileTypes: true }); } catch { return []; } };
 
 function node(id, kind, extra = {}) {
@@ -59,6 +60,26 @@ function fileNode(p, kind) {
 }
 const realId = (p) => { try { return tilde(fs.realpathSync(p)); } catch { return tilde(p); } };
 
+// ---- trust ----
+// Files the user wrote (user scope, managed policy) may point anywhere. A file that came with a project or
+// a plugin may only lead to files inside that project or plugin, or to Markdown instructions in ~/.claude.
+// Anything else it points at (an @import, a symlink, a path in a hook command) is mapped by path but marked
+// outside, and build.mjs never reads, describes or asks for a summary of it, so a cloned repo can't steer
+// the agent into ~/.ssh or ~/.aws. A root of null means trusted.
+const CLAUDE_DIR = real(path.join(HOME, ".claude"));
+const within = (p, root) => p === root || p.startsWith(root.endsWith(path.sep) ? root : root + path.sep);
+const allowed = (p, root) => {
+  if (!root) return true;
+  const r = real(p);
+  return within(r, root) || (r.endsWith(".md") && within(r, CLAUDE_DIR) && !within(r, path.join(CLAUDE_DIR, "projects")));
+};
+const inside = new Set(), outside = new Set();
+function reach(p, kind, root) {
+  const id = fileNode(p, kind), set = allowed(p, root) ? inside : outside;
+  set.add(id); set.add(realId(p));
+  return id;
+}
+
 // ---- memory files and @imports (Claude Code) ----
 // Imports outside code spans/fences, preceded by start or whitespace (so emails don't match).
 function importsOf(text) {
@@ -72,7 +93,8 @@ function importsOf(text) {
   }
   return out;
 }
-function walkImports(p, depth = 0, seen = new Set()) {
+function walkImports(p, root, depth = 0, seen = new Set()) {
+  if (!allowed(p, root)) return;
   const real = (() => { try { return fs.realpathSync(p); } catch { return p; } })();
   if (seen.has(real) || depth > 5) return;
   seen.add(real);
@@ -82,17 +104,17 @@ function walkImports(p, depth = 0, seen = new Set()) {
     const target = ref.startsWith("~/") ? path.join(HOME, ref.slice(2)) : path.resolve(path.dirname(real), ref);
     const looksLikeFile = /\.\w{1,6}$/.test(ref) || ref.includes("/");
     if (!isFile(target) && !looksLikeFile) continue; // prose like @mention, not an import
-    const to = fileNode(target, "memory");
+    const to = reach(target, "memory", root);
     edge(realId(p), to, "imports", { as: "@" + ref, tool: "claude-code" }); // Codex reads files verbatim
-    if (isFile(target)) walkImports(target, depth + 1, seen);
+    if (isFile(target)) walkImports(target, root, depth + 1, seen);
   }
 }
-function memory(session, p, scope) {
+function memory(session, p, scope, root) {
   if (!exists(p) && !lstatLink(p)) return;
   if (edges.some((e) => e.from === session && e.type === "loads" && e.to === tilde(p))) return; // e.g. ~/.claude/CLAUDE.md met again walking up through home
-  const id = fileNode(p, "memory");
+  const id = reach(p, "memory", root);
   edge(session, id, "loads", { scope });
-  walkImports(p);
+  walkImports(p, root);
 }
 
 // Directories from CWD up to the filesystem root, outermost first.
@@ -100,36 +122,43 @@ const ancestors = (() => { const a = []; let d = CWD; for (;;) { a.unshift(d); c
 const gitRoot = [...ancestors].reverse().find((d) => exists(path.join(d, ".git"))) ?? CWD;
 const GIT = tilde(gitRoot);
 
-function settingsFile(session, p, scope) {
+function settingsFile(session, p, scope, root) {
   if (!exists(p)) return null;
-  const id = fileNode(p, "settings");
+  const id = reach(p, "settings", root);
   edge(session, id, "loads", { scope });
+  if (!allowed(p, root)) return null;
   let json;
   try { json = JSON.parse(read(p)); } catch { node(id, "settings", { unparsed: true }); return null; }
-  hooksOf(id, json.hooks);
+  hooksOf(id, json.hooks, undefined, root);
   if (json.env) node(id, "settings", { envKeys: Object.keys(json.env).length }); // count only
   return json;
 }
 
+// An inline command is labelled by its program name only: KEY=value prefixes and arguments can hold secrets.
+const program = (cmd) => {
+  const w = cmd.trim().split(/\s+/).find((t) => !/^\w+=/.test(t)) ?? "";
+  const b = w.replace(/^["']+|["']+$/g, "").split(/[\\/]/).pop();
+  return /^[\w.+-]{1,40}$/.test(b) ? b : "command";
+};
 // A hook command: link to every existing file path it names.
-function hooksOf(fromId, hooks, pluginRoot) {
+function hooksOf(fromId, hooks, pluginRoot, root) {
   for (const [event, groups] of Object.entries(hooks ?? {})) {
     for (const g of groups ?? []) for (const h of g.hooks ?? []) {
       if (h.type !== "command" || !h.command) continue;
       const cmd = h.command.replace(/\$HOME|\$\{HOME\}|%USERPROFILE%|\$env:USERPROFILE/gi, HOME).replace(/\$\{CLAUDE_PLUGIN_ROOT\}|\$CLAUDE_PLUGIN_ROOT/g, pluginRoot ?? "$CLAUDE_PLUGIN_ROOT");
       const paths = [...cmd.matchAll(/["']?((?:~|\/|[A-Za-z]:[\\/])[^"'\s]+)["']?/g)].map((m) => m[1].replace(/^~/, HOME).replace(/[\\"']+$/, "")).filter(isFile);
-      if (!paths.length) { const id = node(`hook:${event}:${cmd.split(/\s/)[0]}`, "hook", { event }); edge(fromId, id, "wires", { event, matcher: g.matcher }); continue; }
-      for (const p of paths) edge(fromId, fileNode(p, "hook"), "wires", { event, matcher: g.matcher });
+      if (!paths.length) { const id = node(`hook:${event}:${program(cmd)}`, "hook", { event }); edge(fromId, id, "wires", { event, matcher: g.matcher }); continue; }
+      for (const p of paths) edge(fromId, reach(p, "hook", root), "wires", { event, matcher: g.matcher });
     }
   }
 }
 
-function skillsIn(owner, dir, tool) {
+function skillsIn(owner, dir, tool, root) {
   let n = 0;
   for (const e of ls(dir)) {
     const p = path.join(dir, e.name, "SKILL.md");
     if (!isFile(p)) continue;
-    const id = fileNode(path.join(dir, e.name), "skill");
+    const id = reach(path.join(dir, e.name), "skill", root);
     node(id, "skill", { name: e.name, tool });
     edge(owner, id, "provides");
     n++;
@@ -141,28 +170,31 @@ function skillsIn(owner, dir, tool) {
 const CC = node("session:claude-code", "session", { tool: "claude-code", cwd: tilde(CWD) });
 
 if (SYSTEM) {
-  for (const p of ["/Library/Application Support/ClaudeCode/CLAUDE.md", "/etc/claude-code/CLAUDE.md"]) memory(CC, p, "managed");
-  for (const p of ["/Library/Application Support/ClaudeCode/managed-settings.json", "/etc/claude-code/managed-settings.json"]) settingsFile(CC, p, "managed");
+  for (const p of ["/Library/Application Support/ClaudeCode/CLAUDE.md", "/etc/claude-code/CLAUDE.md"]) memory(CC, p, "managed", null);
+  for (const p of ["/Library/Application Support/ClaudeCode/managed-settings.json", "/etc/claude-code/managed-settings.json"]) settingsFile(CC, p, "managed", null);
 }
-memory(CC, path.join(HOME, ".claude/CLAUDE.md"), "user");
-for (const e of ls(path.join(HOME, ".claude/rules"))) if (e.name.endsWith(".md")) memory(CC, path.join(HOME, ".claude/rules", e.name), "user-rules");
+memory(CC, path.join(HOME, ".claude/CLAUDE.md"), "user", null);
+for (const e of ls(path.join(HOME, ".claude/rules"))) if (e.name.endsWith(".md")) memory(CC, path.join(HOME, ".claude/rules", e.name), "user-rules", null);
 for (const d of ancestors) {
-  memory(CC, path.join(d, "CLAUDE.md"), d === CWD ? "project" : "ancestor");
-  memory(CC, path.join(d, ".claude/CLAUDE.md"), d === CWD ? "project" : "ancestor");
-  memory(CC, path.join(d, "CLAUDE.local.md"), "local");
+  // Folders inside the repo share its root; a folder above it is its own root.
+  const root = within(d, gitRoot) ? gitRoot : d;
+  memory(CC, path.join(d, "CLAUDE.md"), d === CWD ? "project" : "ancestor", root);
+  memory(CC, path.join(d, ".claude/CLAUDE.md"), d === CWD ? "project" : "ancestor", root);
+  memory(CC, path.join(d, "CLAUDE.local.md"), "local", root);
 }
-for (const e of ls(path.join(CWD, ".claude/rules"))) if (e.name.endsWith(".md")) memory(CC, path.join(CWD, ".claude/rules", e.name), "project-rules");
+for (const e of ls(path.join(CWD, ".claude/rules"))) if (e.name.endsWith(".md")) memory(CC, path.join(CWD, ".claude/rules", e.name), "project-rules", gitRoot);
 // Auto memory: one folder per project, keyed by the project path with separators turned into dashes.
-memory(CC, path.join(HOME, ".claude/projects", gitRoot.replace(/[^A-Za-z0-9]/g, "-"), "memory/MEMORY.md"), "auto-memory");
+const memoryDir = path.join(HOME, ".claude/projects", gitRoot.replace(/[^A-Za-z0-9]/g, "-"), "memory");
+memory(CC, path.join(memoryDir, "MEMORY.md"), "auto-memory", real(memoryDir));
 
-const userSettings = settingsFile(CC, path.join(HOME, ".claude/settings.json"), "user");
-const projSettings = [settingsFile(CC, path.join(CWD, ".claude/settings.json"), "project"), settingsFile(CC, path.join(CWD, ".claude/settings.local.json"), "local")];
+const userSettings = settingsFile(CC, path.join(HOME, ".claude/settings.json"), "user", null);
+const projSettings = [settingsFile(CC, path.join(CWD, ".claude/settings.json"), "project", gitRoot), settingsFile(CC, path.join(CWD, ".claude/settings.local.json"), "local", gitRoot)];
 
 // Skills and agents, user and project.
-const ccUserSkills = skillsIn(CC, path.join(HOME, ".claude/skills"), "claude-code");
-skillsIn(CC, path.join(CWD, ".claude/skills"), "claude-code");
-for (const dir of [path.join(HOME, ".claude/agents"), path.join(CWD, ".claude/agents")]) {
-  for (const e of ls(dir)) if (e.name.endsWith(".md")) edge(CC, fileNode(path.join(dir, e.name), "agent"), "provides");
+const ccUserSkills = skillsIn(CC, path.join(HOME, ".claude/skills"), "claude-code", null);
+skillsIn(CC, path.join(CWD, ".claude/skills"), "claude-code", gitRoot);
+for (const [dir, root] of [[path.join(HOME, ".claude/agents"), null], [path.join(CWD, ".claude/agents"), gitRoot]]) {
+  for (const e of ls(dir)) if (e.name.endsWith(".md")) edge(CC, reach(path.join(dir, e.name), "agent", root), "provides");
 }
 
 // Plugins: enabled in settings, resolved through the install registry; each one's skills fold under it.
@@ -174,16 +206,17 @@ for (const [name, on] of Object.entries(enabled)) {
   const id = node(`plugin:${name}`, "plugin", { tool: "claude-code", installed: Boolean(install) });
   edge(CC, id, "enables");
   if (!install) continue;
-  const skills = skillsIn(id, path.join(install, "skills"), "claude-code");
+  const root = real(install); // a plugin is someone else's code: it may only lead to its own files
+  const skills = skillsIn(id, path.join(install, "skills"), "claude-code", root);
   let agents = 0;
-  for (const e of ls(path.join(install, "agents"))) if (e.name.endsWith(".md")) { agents++; edge(id, fileNode(path.join(install, "agents", e.name), "agent"), "provides"); }
+  for (const e of ls(path.join(install, "agents"))) if (e.name.endsWith(".md")) { agents++; edge(id, reach(path.join(install, "agents", e.name), "agent", root), "provides"); }
   const hooks = read(path.join(install, "hooks/hooks.json"));
   if (hooks) {
     try {
       const h = JSON.parse(hooks);
-      hooksOf(id, h.hooks, install);
+      hooksOf(id, h.hooks, install, root);
       // Function hooks: TypeScript modules loaded in-process (CLAUDE_CODE_ENABLE_FUNCTION_HOOKS).
-      for (const m of h.modules ?? []) edge(id, fileNode(path.resolve(install, "hooks", m), "hook"), "wires", { event: "module" });
+      for (const m of h.modules ?? []) edge(id, reach(path.resolve(install, "hooks", m), "hook", root), "wires", { event: "module" });
     } catch {}
   }
   node(id, "plugin", { skills, agents, folded: true });
@@ -200,33 +233,35 @@ const claudeJson = (() => { try { return JSON.parse(read(path.join(HOME, ".claud
 mcp(CC, claudeJson?.mcpServers, "user");
 mcp(CC, (claudeJson?.projects?.[CWD] ?? claudeJson?.projects?.[slash(CWD)])?.mcpServers, "local"); // Windows may key by either form
 const dotMcp = read(path.join(CWD, ".mcp.json"));
-if (dotMcp) { const id = fileNode(path.join(CWD, ".mcp.json"), "settings"); edge(CC, id, "loads", { scope: "project" }); try { mcp(id, JSON.parse(dotMcp).mcpServers, "project"); } catch {} }
+if (dotMcp) { const id = reach(path.join(CWD, ".mcp.json"), "settings", gitRoot); edge(CC, id, "loads", { scope: "project" }); try { mcp(id, JSON.parse(dotMcp).mcpServers, "project"); } catch {} }
 
 // ================= Codex =================
 const CX = node("session:codex", "session", { tool: "codex", cwd: tilde(CWD) });
 const toml = read(path.join(CODEX_HOME, "config.toml")) ?? "";
-if (toml) edge(CX, fileNode(path.join(CODEX_HOME, "config.toml"), "settings"), "loads", { scope: "user" });
+if (toml) edge(CX, reach(path.join(CODEX_HOME, "config.toml"), "settings", null), "loads", { scope: "user" });
 // Light TOML read: section headers and the fallback-filename list, nothing else.
 const fallback = (toml.match(/^project_doc_fallback_filenames\s*=\s*\[([^\]]*)\]/m)?.[1] ?? "").match(/"([^"]+)"/g)?.map((s) => s.slice(1, -1)) ?? [];
 const pick = (d) => ["AGENTS.override.md", "AGENTS.md", ...fallback].map((f) => path.join(d, f)).find((p) => exists(p));
 
 const globalDoc = [path.join(CODEX_HOME, "AGENTS.override.md"), path.join(CODEX_HOME, "AGENTS.md")].find((p) => exists(p));
-if (globalDoc) edge(CX, fileNode(globalDoc, "memory"), "loads", { scope: "user" });
+if (globalDoc) edge(CX, reach(globalDoc, "memory", null), "loads", { scope: "user" });
 for (const d of ancestors.slice(ancestors.indexOf(gitRoot))) {
   const p = pick(d);
-  if (p) edge(CX, fileNode(p, "memory"), "loads", { scope: d === CWD ? "project" : "ancestor" });
+  if (p) edge(CX, reach(p, "memory", gitRoot), "loads", { scope: d === CWD ? "project" : "ancestor" });
 }
 const cxHooks = read(path.join(CODEX_HOME, "hooks.json"));
-if (cxHooks) { const id = fileNode(path.join(CODEX_HOME, "hooks.json"), "settings"); edge(CX, id, "loads", { scope: "user" }); try { hooksOf(id, JSON.parse(cxHooks).hooks); } catch {} }
-for (const e of ls(path.join(CODEX_HOME, "rules"))) if (e.name.endsWith(".rules")) edge(CX, fileNode(path.join(CODEX_HOME, "rules", e.name), "policy"), "loads", { scope: "user" });
+if (cxHooks) { const id = reach(path.join(CODEX_HOME, "hooks.json"), "settings", null); edge(CX, id, "loads", { scope: "user" }); try { hooksOf(id, JSON.parse(cxHooks).hooks); } catch {} }
+for (const e of ls(path.join(CODEX_HOME, "rules"))) if (e.name.endsWith(".rules")) edge(CX, reach(path.join(CODEX_HOME, "rules", e.name), "policy", null), "loads", { scope: "user" });
 for (const m of toml.matchAll(/^\[mcp_servers\.("?)([^\]."]+)\1\]\s*$/gm)) edge(CX, node(`mcp:${m[2]}`, "mcp"), "connects", { scope: "user" });
 for (const m of toml.matchAll(/^\[plugins\."([^"]+)"\]/gm)) edge(CX, node(`plugin:${m[1]}`, "plugin", { tool: "codex", folded: true }), "enables");
-skillsIn(CX, path.join(CODEX_HOME, "skills"), "codex");
-skillsIn(CX, path.join(HOME, ".agents/skills"), "codex");
-skillsIn(CX, path.join(gitRoot, ".agents/skills"), "codex");
+skillsIn(CX, path.join(CODEX_HOME, "skills"), "codex", null);
+skillsIn(CX, path.join(HOME, ".agents/skills"), "codex", null);
+skillsIn(CX, path.join(gitRoot, ".agents/skills"), "codex", gitRoot);
 // Codex search order (AGENTS.override.md, fallbacks, ~/.agents/skills) is unconfirmed; the page does not draw Codex yet.
 
 // ================= output =================
+// Reached only from somewhere it may not lead: map it, never open it.
+for (const id of outside) if (!inside.has(id) && nodes.has(id)) node(id, nodes.get(id).kind, { outside: true });
 // A memory file both tools load is one node with two incoming loads; that overlap is the interesting part.
 const graph = { home: slash(HOME), cwd: slash(CWD), gitRoot: slash(gitRoot), generated: new Date().toISOString(), nodes: [...nodes.values()], edges, notes };
 if (argv.includes("--json")) { process.stdout.write(JSON.stringify(graph, null, 1) + "\n"); process.exit(0); }
