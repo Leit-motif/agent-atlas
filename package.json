@@ -1,6 +1,6 @@
 {
   "name": "agent-atlas",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Map what a Claude Code session loads on your machine: instructions, imports, settings, hooks, skills, subagents, plugins and MCP servers.",
   "type": "module",
   "license": "MIT",

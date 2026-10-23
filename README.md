@@ -49,6 +49,9 @@ summary of each, and opens the map in your browser. The page and its data are sa
 `~/.claude/agent-atlas/`, never inside your project. Run it again after changing your setup; only
 files that changed get new summaries.
 
+Every file you can change has **Open in editor** (VS Code, Cursor or VSCodium; the page remembers
+your pick) and **Copy path** for anything else.
+
 Needs Node 20 or later. Nothing else to install.
 
 ### Without Claude
@@ -86,6 +89,14 @@ Symlinks are followed to the real file, so a shared rules file shows up once, wh
 Discovery reads structure, not secrets. Environment variable values, MCP commands, arguments,
 headers and tokens never reach the graph or the page; only names and counts do. The tests plant
 fake secrets and fail if one leaks.
+
+The page makes no network requests. Its scripts and fonts are bundled into the file, and a
+Content-Security-Policy lets only its own two scripts run and blocks every connection out, so
+nothing in a file it maps can run code or send your setup anywhere.
+
+A project or plugin can't steer Atlas into your other files: anything it points to outside itself
+(an import of `~/.aws/credentials`, a symlink into `~/.ssh`, a note in `~/.claude`) is shown by
+path, marked *not opened*, and never read or summarized. See [SECURITY.md](SECURITY.md).
 
 ## Every line is proven, every summary is labelled
 

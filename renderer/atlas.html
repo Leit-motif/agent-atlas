@@ -1,8 +1,6 @@
 <meta charset="utf-8">
 <title>Claude Code Atlas</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>/*@FONTS@*/</style>
 <style>
 /* Layout: an app shell. A living graph on the left that folds like a tree (rings are depth, wedges are areas), an inspector on the right; stacked on phones. */
 :root{
@@ -161,6 +159,7 @@ dl.items dd{margin:0;color:color-mix(in srgb,var(--fg) 86%,var(--muted))}
 .file .row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .file .mini{font-size:12px;padding:3px 9px;border-radius:6px;border:1px solid var(--line);background:var(--panel);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:5px}
 .file .mini:hover{border-color:var(--edge)}
+.file .mini[hidden]{display:none}
 .file .after{font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:3px}
 .file .after code{display:block;padding:4px 7px;white-space:pre-wrap}
 .file.gen{background:transparent;border-style:dashed}
@@ -180,6 +179,11 @@ dl.items dd{margin:0;color:color-mix(in srgb,var(--fg) 86%,var(--muted))}
 .kgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,290px),1fr));gap:10px}
 .kgrid .file{background:var(--panel)}
 .kgrid .file.gen{background:transparent}
+.menu{position:fixed;z-index:60;min-width:190px;background:var(--panel);border:1px solid var(--line);border-radius:9px;box-shadow:0 8px 24px rgb(0 0 0 / .14);padding:4px;display:flex;flex-direction:column}
+.menu .lbl{font-size:11.5px;color:var(--muted);padding:6px 10px 4px}
+.menu button{text-align:left;background:none;border:0;border-radius:6px;padding:7px 10px;font-size:13px;cursor:pointer}
+.menu button:hover,.menu button:focus-visible{background:var(--raised)}
+.menu button[aria-checked="true"]::after{content:" ✓";color:var(--muted)}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:7px 14px;border-radius:8px;font-size:13px;z-index:50}
 footer.foot{font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:12px}
 
@@ -239,8 +243,9 @@ footer.foot{font-size:12px;color:var(--muted);border-top:1px solid var(--line);p
   </main>
 </div>
 <div class="toast" id="toast" hidden></div>
+<div class="menu" id="editorMenu" role="menu" aria-label="Open files in" hidden></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script>/*@D3@*/</script>
 <script>
 /*@ATLAS_DATA@*/
 const TYPES = {
@@ -567,17 +572,42 @@ function go(id){
 
 /* ---------- inspector ---------- */
 const AFTER_DEFAULT = AFTER.doc;
+// Open in editor: VS Code and its forks open a file from a vscode://file/<absolute path> style link.
+// The choice is remembered per browser; nothing is sent anywhere, the OS hands the link to the app.
+const EDITORS = { vscode: "VS Code", cursor: "Cursor", vscodium: "VSCodium" };
+const editor = () => { try { const e = localStorage.getItem("atlas-editor"); return EDITORS[e] ? e : null; } catch { return null; } };
+const openLabel = () => editor() ? `Open in ${EDITORS[editor()]}` : "Open in editor…";
+const absPath = p => p.startsWith("~") ? LOCAL.slice(0, -1) + p.slice(1) : p;
+function editorUrl(e, p){
+  const a = absPath(p);
+  return `${e}://file${a.startsWith("/") ? "" : "/"}${encodeURI(a).replace(/#/g, "%23").replace(/\?/g, "%3F")}`;
+}
+function openIn(e, p){
+  location.href = editorUrl(e, p);
+  toast(`Opening in ${EDITORS[e]}. Nothing happening? It may not be installed: pick another editor with ▾, or copy the path.`, 4200);
+}
+function pickEditor(btn, p){
+  const m = $("#editorMenu"), cur = editor();
+  m.innerHTML = `<div class="lbl">Open files in</div>` + Object.entries(EDITORS).map(([k, v]) => `<button type="button" role="menuitemradio" aria-checked="${k === cur}" data-editor="${k}">${esc(v)}</button>`).join("");
+  m.dataset.path = p || "";
+  const r = btn.getBoundingClientRect();
+  m.hidden = false;
+  m.style.left = Math.max(8, Math.min(r.left, innerWidth - m.offsetWidth - 8)) + "px";
+  m.style.top = (r.bottom + m.offsetHeight + 6 > innerHeight ? r.top - m.offsetHeight - 6 : r.bottom + 6) + "px";
+  m.querySelector("button").focus();
+}
 function fileCard(f){
-  const [p, note, after, src] = f, isLocal = p.startsWith("~") || p.startsWith("/") || /^[A-Za-z]:\//.test(p), isGen = after === "gen";
+  const [p, note, after, src] = f, isLocal = p.startsWith("~") || p.startsWith("/") || /^[A-Za-z]:\//.test(p), isGen = after === "gen" || after === "outside";
   const a = AFTER[after] || AFTER_DEFAULT;
   const gh = isLocal || !REPO ? null : `${REPO}/${p.endsWith("/") ? "tree" : "blob"}/main/${p.replace(/\/$/,"")}`;
   const full = isLocal ? p : LOCAL + p;
-  const badge = isGen ? `<span class="badge gen">don't edit</span>` : isLocal ? `<span class="badge local">on this machine</span>` : (after==="doc" ? "" : `<span class="badge edit">tune here</span>`);
+  const badge = isGen ? `<span class="badge gen">${after === "outside" ? "not opened" : "don't edit"}</span>` : isLocal ? `<span class="badge local">on this machine</span>` : (after==="doc" ? "" : `<span class="badge edit">tune here</span>`);
   return `<div class="file${isGen?" gen":""}">
     <div class="row"><span class="path">${esc(p)}</span>${badge}</div>
     <div class="note">${fmt(note)}</div>
     <div class="row">
       ${gh ? `<a class="mini" href="${gh}" target="_blank" rel="noopener">Open on GitHub ↗</a>` : ""}
+      ${isLocal && !isGen ? `<button class="mini" type="button" data-open="${esc(p)}">${esc(openLabel())}</button><button class="mini" type="button" data-pick aria-label="Choose editor" title="Choose editor"${editor() ? "" : " hidden"}>▾</button>` : ""}
       <button class="mini" type="button" data-copy="${esc(full)}">Copy path</button>
       ${src ? `<button class="mini" type="button" data-src="${esc(src)}">Go to source →</button>` : ""}
     </div>
@@ -696,10 +726,26 @@ q.addEventListener("keydown", e => {
 document.addEventListener("click", e => { if (!e.target.closest(".search")) res.hidden = true; });
 
 /* ---------- delegated clicks ---------- */
-function toast(msg){ const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => t.hidden = true, 1600); }
+function toast(msg, ms = 1600){ const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => t.hidden = true, ms); }
 document.addEventListener("click", e => {
-  const t = e.target.closest("[data-copy],[data-go],[data-page],[data-src],[data-hit],[data-trace],[data-lens]");
+  const m = $("#editorMenu");
+  if (m.hidden || e.target.closest("#editorMenu,[data-open],[data-pick]")) return;
+  m.hidden = true;
+});
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("#editorMenu").hidden){ $("#editorMenu").hidden = true; } });
+document.addEventListener("click", e => {
+  const t = e.target.closest("[data-copy],[data-go],[data-page],[data-src],[data-hit],[data-trace],[data-lens],[data-open],[data-pick],[data-editor]");
   if (!t) return;
+  if (t.dataset.open !== undefined){ const ed = editor(); ed ? openIn(ed, t.dataset.open) : pickEditor(t, t.dataset.open); return; }
+  if (t.dataset.pick !== undefined) return pickEditor(t, t.previousElementSibling?.dataset.open);
+  if (t.dataset.editor){
+    const m = $("#editorMenu"), p = m.dataset.path;
+    try { localStorage.setItem("atlas-editor", t.dataset.editor); } catch {}
+    m.hidden = true;
+    document.querySelectorAll("[data-open]").forEach(b => { b.textContent = openLabel(); b.nextElementSibling.hidden = false; });
+    if (p) openIn(t.dataset.editor, p);
+    return;
+  }
   if (t.dataset.hit) return go(t.dataset.hit);
   if (t.dataset.copy){ const v = t.dataset.copy; navigator.clipboard.writeText(v).then(() => toast("Path copied")).catch(() => toast(v)); return; }
   if (t.dataset.go) return go(t.dataset.go);
