@@ -9,7 +9,7 @@ search and click through.
 
 ![The Atlas for a sample project: opening Instructions shows the files they import, opening Hooks leads to a hook that blocks force-pushes and the settings file that wires it, then the Files view lists every file you can edit](docs/atlas-demo.gif)
 
-*A made-up project, recorded with `npm run record`. [Full-quality video (MP4)](docs/atlas-demo.mp4). Your own map stays on your machine.*
+*A made-up project. [Full-quality video (MP4)](docs/atlas-demo.mp4). Your own map stays on your machine.*
 
 ## Install
 
@@ -43,11 +43,11 @@ git clone https://github.com/Leit-motif/agent-atlas && cd agent-atlas
 ```
 
 ```bash
-mkdir -p out && node src/discover.mjs --cwd /path/to/your/project --json > out/graph.json
+node src/discover.mjs --cwd /path/to/your/project --json > graph.json
 ```
 
 ```bash
-node src/build.mjs out/graph.json out/atlas.html
+node src/build.mjs graph.json atlas.html
 ```
 
 ## What it finds
@@ -84,10 +84,6 @@ going stale.
 ## Status
 
 Early. Claude Code only for now; `discover.mjs` also reads Codex's files, but the page doesn't
-draw them yet. Tested on macOS.
-
-```bash
-npm test
-```
+draw them yet. Works on macOS, Linux and Windows 10 or later.
 
 MIT licensed.

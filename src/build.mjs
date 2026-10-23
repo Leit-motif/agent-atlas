@@ -15,7 +15,7 @@ const flag = (name) => { const i = process.argv.indexOf(name); return i < 0 ? nu
 const G = JSON.parse(fs.readFileSync(graphPath, "utf8"));
 const HOME = G.home;
 const abs = (id) => (id.startsWith("~") ? HOME + id.slice(1) : id);
-const read = (p) => { try { return fs.readFileSync(p, "utf8"); } catch { return null; } };
+const read = (p) => { try { return fs.readFileSync(p, "utf8").replace(/\r\n/g, "\n"); } catch { return null; } }; // CRLF files from Windows checkouts
 
 // ---- Claude Code's slice of the graph ----
 const ROOT = "session:claude-code";

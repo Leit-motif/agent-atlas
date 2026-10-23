@@ -568,7 +568,7 @@ function go(id){
 /* ---------- inspector ---------- */
 const AFTER_DEFAULT = AFTER.doc;
 function fileCard(f){
-  const [p, note, after, src] = f, isLocal = p.startsWith("~") || p.startsWith("/"), isGen = after === "gen";
+  const [p, note, after, src] = f, isLocal = p.startsWith("~") || p.startsWith("/") || /^[A-Za-z]:\//.test(p), isGen = after === "gen";
   const a = AFTER[after] || AFTER_DEFAULT;
   const gh = isLocal || !REPO ? null : `${REPO}/${p.endsWith("/") ? "tree" : "blob"}/main/${p.replace(/\/$/,"")}`;
   const full = isLocal ? p : LOCAL + p;

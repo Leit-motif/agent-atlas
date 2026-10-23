@@ -22,8 +22,10 @@ const nodes = new Map();
 const edges = [];
 const notes = [];
 
-const tilde = (p) => (p === HOME || p.startsWith(HOME + path.sep) ? "~" + p.slice(HOME.length) : p);
-const show = (id) => (GIT && id.startsWith(GIT + path.sep) ? "<repo>" + id.slice(GIT.length) : id);
+// Node ids use "/" on every OS, so build.mjs and the page never see a Windows backslash.
+const slash = (p) => p.split(path.sep).join("/");
+const tilde = (p) => { p = path.normalize(p); return slash(p === HOME || p.startsWith(HOME + path.sep) ? "~" + p.slice(HOME.length) : p); }; // normalize: on Windows a hook can name C:\x\home/y
+const show = (id) => (GIT && id.startsWith(GIT + "/") ? "<repo>" + id.slice(GIT.length) : id);
 const exists = (p) => { try { fs.statSync(p); return true; } catch { return false; } };
 const isFile = (p) => { try { return fs.statSync(p).isFile(); } catch { return false; } };
 const lstatLink = (p) => { try { return fs.lstatSync(p).isSymbolicLink(); } catch { return false; } };
@@ -114,8 +116,8 @@ function hooksOf(fromId, hooks, pluginRoot) {
   for (const [event, groups] of Object.entries(hooks ?? {})) {
     for (const g of groups ?? []) for (const h of g.hooks ?? []) {
       if (h.type !== "command" || !h.command) continue;
-      const cmd = h.command.replace(/\$HOME|\$\{HOME\}/g, HOME).replace(/\$\{CLAUDE_PLUGIN_ROOT\}|\$CLAUDE_PLUGIN_ROOT/g, pluginRoot ?? "$CLAUDE_PLUGIN_ROOT");
-      const paths = [...cmd.matchAll(/["']?((?:~|\/)[^"'\s]+)["']?/g)].map((m) => m[1].replace(/^~/, HOME).replace(/[\\"']+$/, "")).filter(isFile);
+      const cmd = h.command.replace(/\$HOME|\$\{HOME\}|%USERPROFILE%|\$env:USERPROFILE/gi, HOME).replace(/\$\{CLAUDE_PLUGIN_ROOT\}|\$CLAUDE_PLUGIN_ROOT/g, pluginRoot ?? "$CLAUDE_PLUGIN_ROOT");
+      const paths = [...cmd.matchAll(/["']?((?:~|\/|[A-Za-z]:[\\/])[^"'\s]+)["']?/g)].map((m) => m[1].replace(/^~/, HOME).replace(/[\\"']+$/, "")).filter(isFile);
       if (!paths.length) { const id = node(`hook:${event}:${cmd.split(/\s/)[0]}`, "hook", { event }); edge(fromId, id, "wires", { event, matcher: g.matcher }); continue; }
       for (const p of paths) edge(fromId, fileNode(p, "hook"), "wires", { event, matcher: g.matcher });
     }
@@ -196,7 +198,7 @@ function mcp(owner, servers, scope) {
 }
 const claudeJson = (() => { try { return JSON.parse(read(path.join(HOME, ".claude.json"))); } catch { return null; } })();
 mcp(CC, claudeJson?.mcpServers, "user");
-mcp(CC, claudeJson?.projects?.[CWD]?.mcpServers, "local");
+mcp(CC, (claudeJson?.projects?.[CWD] ?? claudeJson?.projects?.[slash(CWD)])?.mcpServers, "local"); // Windows may key by either form
 const dotMcp = read(path.join(CWD, ".mcp.json"));
 if (dotMcp) { const id = fileNode(path.join(CWD, ".mcp.json"), "settings"); edge(CC, id, "loads", { scope: "project" }); try { mcp(id, JSON.parse(dotMcp).mcpServers, "project"); } catch {} }
 
@@ -226,7 +228,7 @@ skillsIn(CX, path.join(gitRoot, ".agents/skills"), "codex");
 
 // ================= output =================
 // A memory file both tools load is one node with two incoming loads; that overlap is the interesting part.
-const graph = { home: HOME, cwd: CWD, gitRoot, generated: new Date().toISOString(), nodes: [...nodes.values()], edges, notes };
+const graph = { home: slash(HOME), cwd: slash(CWD), gitRoot: slash(gitRoot), generated: new Date().toISOString(), nodes: [...nodes.values()], edges, notes };
 if (argv.includes("--json")) { process.stdout.write(JSON.stringify(graph, null, 1) + "\n"); process.exit(0); }
 
 const by = (t) => edges.filter((e) => e.type === t);
