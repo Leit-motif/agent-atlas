@@ -21,12 +21,20 @@ In Claude Code (2.1.275 or later):
 
 ### Update
 
+Ask Claude: *"Update the agent-atlas plugin."* Or run it yourself:
+
 ```bash
 claude plugin marketplace update agent-atlas
 claude plugin update agent-atlas@agent-atlas
 ```
 
-Then restart Claude Code.
+Then restart Claude Code. The new version loads in the next session.
+
+> **For agents updating this plugin:** run the two commands above in a shell, in that order. The
+> first pulls the latest plugin list from GitHub; without it the second finds nothing new. Success
+> prints `updated from <old> to <new>`, or `already at the latest version`. You cannot restart
+> Claude Code yourself: tell the user to restart it. If `claude` is not on the PATH, tell the user
+> to update from the `/plugin` menu instead.
 
 ## Use
 
