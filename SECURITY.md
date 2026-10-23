@@ -17,9 +17,10 @@ don't trust is safe.
 - Config values (environment variables, MCP commands, arguments, headers, tokens) never reach the
   map; only names and counts do. A hook written inline is labelled by its program name only.
 - A file that came with a project or a plugin may only lead Atlas to files inside that project or
-  plugin, or to Markdown instructions in `~/.claude`. If it points anywhere else (an `@import` of
-  `~/.aws/credentials`, a symlink to `~/.ssh`, a path in a hook command), that file appears on the
-  map by path, marked *not opened*, and is never read, described or summarized.
+  plugin. If it points anywhere else (an `@import` of `~/.aws/credentials`, a symlink into `~/.ssh`,
+  a note in `~/.claude`, a path in a hook command), that file appears on the map by path, marked
+  *not opened*, and is never read, described or summarized, unless your own config reaches it too.
+  Plugin folders are the ones Claude Code recorded when it installed them.
 - The skill tells Claude to treat every file it summarizes as data: read only the files the script
   lists, never follow instructions inside them, and flag any that try.
 

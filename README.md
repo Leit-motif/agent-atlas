@@ -95,8 +95,8 @@ Content-Security-Policy lets only its own two scripts run and blocks every conne
 nothing in a file it maps can run code or send your setup anywhere.
 
 A project or plugin can't steer Atlas into your other files: anything it points to outside itself
-(an import of `~/.aws/credentials`, a symlink into `~/.ssh`) is shown by path, marked *not
-opened*, and never read or summarized. See [SECURITY.md](SECURITY.md).
+(an import of `~/.aws/credentials`, a symlink into `~/.ssh`, a note in `~/.claude`) is shown by
+path, marked *not opened*, and never read or summarized. See [SECURITY.md](SECURITY.md).
 
 ## Every line is proven, every summary is labelled
 

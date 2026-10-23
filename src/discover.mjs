@@ -62,17 +62,12 @@ const realId = (p) => { try { return tilde(fs.realpathSync(p)); } catch { return
 
 // ---- trust ----
 // Files the user wrote (user scope, managed policy) may point anywhere. A file that came with a project or
-// a plugin may only lead to files inside that project or plugin, or to Markdown instructions in ~/.claude.
-// Anything else it points at (an @import, a symlink, a path in a hook command) is mapped by path but marked
-// outside, and build.mjs never reads, describes or asks for a summary of it, so a cloned repo can't steer
-// the agent into ~/.ssh or ~/.aws. A root of null means trusted.
-const CLAUDE_DIR = real(path.join(HOME, ".claude"));
+// a plugin may only lead to files inside that project or plugin. Anything else it points at (an @import, a
+// symlink, a path in a hook command) is mapped by path but marked outside, and build.mjs never reads,
+// describes or asks for a summary of it, so a cloned repo can't steer the agent into ~/.ssh, ~/.aws or your
+// notes. A file your own config also reaches stays readable. A root of null means trusted.
 const within = (p, root) => p === root || p.startsWith(root.endsWith(path.sep) ? root : root + path.sep);
-const allowed = (p, root) => {
-  if (!root) return true;
-  const r = real(p);
-  return within(r, root) || (r.endsWith(".md") && within(r, CLAUDE_DIR) && !within(r, path.join(CLAUDE_DIR, "projects")));
-};
+const allowed = (p, root) => !root || within(real(p), root);
 const inside = new Set(), outside = new Set();
 function reach(p, kind, root) {
   const id = fileNode(p, kind), set = allowed(p, root) ? inside : outside;
@@ -136,8 +131,9 @@ function settingsFile(session, p, scope, root) {
 
 // An inline command is labelled by its program name only: KEY=value prefixes and arguments can hold secrets.
 const program = (cmd) => {
-  const w = cmd.trim().split(/\s+/).find((t) => !/^\w+=/.test(t)) ?? "";
-  const b = w.replace(/^["']+|["']+$/g, "").split(/[\\/]/).pop();
+  const rest = cmd.trim().replace(/^(?:\w+=(?:"[^"]*"|'[^']*'|\S*)\s+)+/, "");
+  const m = rest.match(/^"([^"]*)"|^'([^']*)'|^(\S+)/);
+  const b = (m?.[1] ?? m?.[2] ?? m?.[3] ?? "").split(/[\\/]/).pop();
   return /^[\w.+-]{1,40}$/.test(b) ? b : "command";
 };
 // A hook command: link to every existing file path it names.
