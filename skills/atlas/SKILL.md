@@ -1,6 +1,6 @@
 ---
 name: atlas
-description: Draw a map of everything Claude Code loads in this folder (CLAUDE.md files and their @imports, settings, hooks, skills, subagents, plugins, MCP servers) as one interactive HTML page, with a plain-language summary of each file. Use when the user asks what Claude Code loads, where an instruction comes from, to map or audit their Claude Code setup, or runs /atlas.
+description: Draw a map of everything Claude Code loads in this folder (CLAUDE.md files and their @imports, settings, hooks, skills, subagents, plugins, MCP servers) as one interactive HTML page, with a plain-language summary of each file. Use when the user asks what Claude Code loads, where an instruction comes from, to map or audit their Claude Code setup, or runs /atlas. Also use when the user asks to update agent-atlas.
 ---
 
 # Atlas
@@ -62,3 +62,17 @@ Open `$OUT/atlas.html` for the user: `open` on macOS, `xdg-open` on Linux, `star
 Then tell them in a few lines: how many files load at start, anything the script flagged as
 missing, and one thing on the map they might not have known about (an import chain, a hook, a
 plugin's skills). Give the page's full path.
+
+## Updating agent-atlas
+
+If the user asks to update this plugin, run these two commands, in order:
+
+```bash
+claude plugin marketplace update agent-atlas
+claude plugin update agent-atlas@agent-atlas
+```
+
+The first refreshes the plugin list from GitHub; the second installs the newest version and prints
+`updated from <old> to <new>` or `already at the latest version`. Report which, then tell the user
+to restart Claude Code: the new version loads in the next session, and you cannot restart it for
+them. Don't build a map unless they also asked for one.
