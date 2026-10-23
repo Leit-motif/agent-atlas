@@ -1,6 +1,5 @@
 <meta charset="utf-8">
 <title>Claude Code Atlas</title>
-<meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
@@ -206,6 +205,7 @@ footer.foot{font-size:12px;color:var(--muted);border-top:1px solid var(--line);p
       </div>
       <button class="btn" id="expandAll" type="button">Unfold all</button>
       <button class="btn" id="collapseAll" type="button">Fold</button>
+      <button class="btn" id="themeBtn" type="button" style="padding:6px 8px"></button>
       <div class="views" role="tablist" aria-label="View"><button id="mapBtn" type="button" role="tab" aria-selected="true">Map</button><button id="knobsBtn" type="button" role="tab" aria-selected="false">Files</button></div>
     </div>
   </header>
@@ -720,6 +720,22 @@ function views(){ $("#mapBtn").setAttribute("aria-selected", !knobsOpen); $("#kn
 $("#knobsBtn").addEventListener("click", openKnobs);
 $("#mapBtn").addEventListener("click", () => { if (knobsOpen) openPage(focus); });
 $("#fitBtn").addEventListener("click", () => fit());
+// Theme: Auto follows the system; Light and Dark set data-theme, which the CSS above honours. Remembered per browser.
+const THEMES = ["auto", "light", "dark"];
+const THEME_ICON = {
+  auto: '<circle cx="8" cy="8" r="6"/><path d="M8 2a6 6 0 0 1 0 12z" fill="currentColor"/>',
+  light: '<circle cx="8" cy="8" r="3"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.4 1.4M11.6 11.6L13 13M3 13l1.4-1.4M11.6 4.4L13 3" stroke-linecap="round"/>',
+  dark: '<path d="M13.5 9.5A6 6 0 0 1 6.5 2.5a6 6 0 1 0 7 7z" stroke-linejoin="round"/>',
+};
+function setTheme(t){
+  if (t === "auto") delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t;
+  const b = $("#themeBtn"), label = { auto: "Theme: follows the system", light: "Theme: light", dark: "Theme: dark" }[t];
+  b.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">${THEME_ICON[t]}</svg>`; b.title = label + ". Click to change."; b.setAttribute("aria-label", label);
+  try { localStorage.setItem("atlas-theme", t); } catch {}
+}
+setTheme((() => { try { const t = localStorage.getItem("atlas-theme"); return THEMES.includes(t) ? t : "auto"; } catch { return "auto"; } })());
+$("#themeBtn").addEventListener("click", () => setTheme(THEMES[(THEMES.indexOf(document.documentElement.dataset.theme ?? "auto") + 1) % 3]));
+
 $("#expandAll").addEventListener("click", () => {
   if (knobsOpen) openPage(focus);
   (function unfold(id){ const n = byId.get(id); if (n.c){ expanded.add(id); n.c.forEach(c => unfold(c.id)); } })(focus);
