@@ -1,6 +1,6 @@
 {
   "name": "agent-atlas",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Map everything a Claude Code session loads: instructions and their imports, settings, hooks, skills, subagents, plugins and MCP servers, as one interactive page.",
   "author": { "name": "Amrit Chana", "url": "https://github.com/Leit-motif" },
   "homepage": "https://github.com/Leit-motif/agent-atlas",

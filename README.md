@@ -19,6 +19,15 @@ In Claude Code (2.1.275 or later):
 /plugin install agent-atlas --marketplace Leit-motif/agent-atlas
 ```
 
+### Update
+
+```bash
+claude plugin marketplace update agent-atlas
+claude plugin update agent-atlas@agent-atlas
+```
+
+Then restart Claude Code.
+
 ## Use
 
 Open Claude Code in any project and run:
