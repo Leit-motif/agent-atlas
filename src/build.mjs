@@ -84,7 +84,7 @@ const memLoads = loads.filter((e) => N.get(e.to).kind === "memory");
 const instructions = {
   id: "instructions", br: "rules", t: "Instructions", k: `${memLoads.length} entry files, ${[...reach].filter((g) => N.get(g)?.kind === "memory").length} in all`,
   s: "Every instruction file Claude Code reads when a session starts in this folder, with what each one imports. Imports nest under the file that pulls them in.",
-  b: ["Claude Code reads these once, at session start, so an edit reaches the next session, not the one running.", "Order matters only loosely: more specific files (the project's) are read after broader ones (yours), and the model sees all of them."],
+  b: ["Claude Code reads these when a session starts, so an edit reaches the next session, not the one running.", "Order matters only loosely: more specific files (the project's) are read after broader ones (yours), and the model sees all of them."],
   c: memLoads.map((e) => memoryNode(e.to, SCOPE[e.scope] ?? e.scope)).filter(Boolean),
 };
 // Every loaded instruction file flows into the session.
@@ -224,13 +224,13 @@ const goodLinks = LINKS.filter((l) => valid.has(l[0]) && valid.has(l[1]) && l[0]
 const KNOBS = [
   { t: "Instructions", br: "rules", s: "The files whose text the model reads every session.", f: [...idOf].filter(([g]) => N.get(g)?.kind === "memory" && !N.get(g).missing && !out(g, "links-to").length && !inPluginCache(g) && !sealed(g)).map(([g]) => [g, "Read at session start.", "live"]) },
   { t: "Settings", br: "claude", s: "Permissions, environment, hooks and plugins.", f: settingsLoads.filter((e) => !sealed(e.to)).map((e) => [e.to, SCOPE[e.scope] ?? e.scope, "live"]) },
-  { t: "Hooks", br: "trust", s: "Scripts that run at fixed moments.", f: [...new Set(wires.map((e) => e.to))].filter((g) => !inPluginCache(g) && !sealed(g) && !g.startsWith("hook:")).map((g) => [g, "A hook script.", "live"]) },
+  { t: "Hooks", br: "trust", s: "Scripts that run at fixed moments.", f: [...new Set(wires.map((e) => e.to))].filter((g) => !inPluginCache(g) && !sealed(g) && !g.startsWith("hook:")).map((g) => [g, "A hook script. Edits apply the next time it runs.", "live"]) },
   { t: "Your skills", br: "skills", s: "Skills you can edit directly.", f: mySkills.map((s) => s.f[0]).filter((f) => f[2] !== "outside") },
 ].filter((g) => g.f.length);
 
 // ---- fill the renderer ----
 const AFTER = {
-  live: { cmd: null, say: "Edit it in place. The next session that starts here picks it up." },
+  live: { cmd: null, say: "Edit it in place." },
   skills: { cmd: null, say: "Edit SKILL.md in place. The next session lists the change." },
   gen: { cmd: null, say: "Don't edit this copy: it is a link or ships with a plugin. Change what it points to." },
   outside: { cmd: null, say: "A project or plugin points here, outside itself. Atlas leaves it unopened." },

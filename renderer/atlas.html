@@ -692,9 +692,9 @@ function openKnobs(){
   knobsOpen = true; views();
   const m = $("#main"); savedMain = m;
   const wrap = document.createElement("main"); wrap.id = "main"; wrap.className = "knobs";
-  wrap.innerHTML = `<div class="intro"><h2>Files</h2><p>Every file you can edit to change how Claude Code behaves here, grouped by what it controls. Dashed cards are links or plugin copies: change what they point to instead. Edits reach the next session that starts in this folder.</p></div>`
+  wrap.innerHTML = `<div class="intro"><h2>Files</h2><p>Every file you can edit to change how Claude Code behaves here, grouped by what it controls. Dashed cards are links or plugin copies: change what they point to instead. Most edits reach the next session that starts in this folder; a hook script's apply the next time it runs.</p></div>`
    + KNOBS.map(g => `<section class="kgroup" style="--hue:${hue(g.br)}"><h3><i></i>${esc(g.t)}</h3><p>${esc(g.s)}</p><div class="kgrid">${g.f.map(fileCard).join("")}</div></section>`).join("")
-   + `<footer class="foot">Paths are on this machine. Edits apply to the next session that starts here.</footer>`;
+   + `<footer class="foot">Paths are on this machine. Most edits apply to the next session that starts here; hook scripts apply the next time they run.</footer>`;
   m.replaceWith(wrap);
   crumbs(); setHash("knobs"); window.scrollTo(0,0);
 }
